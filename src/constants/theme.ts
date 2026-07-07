@@ -26,10 +26,21 @@ export const Colors = {
 
 export type ThemeColor = keyof typeof Colors.light & keyof typeof Colors.dark;
 
+/**
+ * Inter font families. Each weight is a separate family (registered via
+ * `useFonts` in the root layout) because React Native does not synthesize
+ * weights from a single font file. Reference these by name — do not rely on
+ * `fontWeight` for custom fonts.
+ */
+const Inter = {
+  sans: 'Inter', // Regular (400)
+  sansSemiBold: 'Inter-SemiBold', // SemiBold (600)
+  sansExtraLight: 'Inter-ExtraLight', // ExtraLight (200)
+} as const;
+
 export const Fonts = Platform.select({
   ios: {
-    /** iOS `UIFontDescriptorSystemDesignDefault` */
-    sans: 'system-ui',
+    ...Inter,
     /** iOS `UIFontDescriptorSystemDesignSerif` */
     serif: 'ui-serif',
     /** iOS `UIFontDescriptorSystemDesignRounded` */
@@ -38,13 +49,13 @@ export const Fonts = Platform.select({
     mono: 'ui-monospace',
   },
   default: {
-    sans: 'normal',
+    ...Inter,
     serif: 'serif',
     rounded: 'normal',
     mono: 'monospace',
   },
   web: {
-    sans: 'var(--font-display)',
+    ...Inter,
     serif: 'var(--font-serif)',
     rounded: 'var(--font-rounded)',
     mono: 'var(--font-mono)',

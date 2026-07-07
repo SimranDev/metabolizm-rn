@@ -32,35 +32,39 @@ export function ThemedText({ style, type = 'default', themeColor, ...rest }: The
 
 const styles = StyleSheet.create({
   small: {
+    fontFamily: Fonts.sans,
     fontSize: 14,
     lineHeight: 20,
-    fontWeight: 500,
   },
   smallBold: {
+    fontFamily: Fonts.sansSemiBold,
     fontSize: 14,
     lineHeight: 20,
-    fontWeight: 700,
   },
   default: {
+    fontFamily: Fonts.sans,
     fontSize: 16,
     lineHeight: 24,
-    fontWeight: 500,
   },
   title: {
+    fontFamily: Fonts.sansSemiBold,
     fontSize: 48,
-    fontWeight: 600,
-    lineHeight: 52,
+    // Inter's descenders need ~1.21x the font size; a tighter line height
+    // clips glyph tails like the "g" in "Log".
+    lineHeight: 60,
   },
   subtitle: {
+    fontFamily: Fonts.sansSemiBold,
     fontSize: 32,
     lineHeight: 44,
-    fontWeight: 600,
   },
   link: {
+    fontFamily: Fonts.sans,
     lineHeight: 30,
     fontSize: 14,
   },
   linkPrimary: {
+    fontFamily: Fonts.sans,
     lineHeight: 30,
     fontSize: 14,
     color: '#3c87f7',

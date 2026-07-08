@@ -1,56 +1,71 @@
-# Welcome to your Expo app 👋
+# Metabolizm
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+A Health & Fitness app for **iOS and Android** — a "swiss-knife for fitness" whose core is **weight, calorie, and macro/micro tracking**, with a growing set of surrounding features. You set your goals, log what you eat (by search or barcode), and Metabolizm keeps your calories, macros, micros, weight, and activity in one place.
 
-## Get started
+> Status: early development. This document evolves with the project.
 
-1. Install dependencies
+## Features
 
-   ```bash
-   npm install
-   ```
+### Core
+- **Profile & goals** — create a profile and set fitness goals (gain muscle, lose weight, maintain), with BMR/TDEE-based calorie and macro targets.
+- **Food logging** — record calorie intake plus macros and micronutrients.
+- **Barcode scanning** — scan a product to pull its nutrition details.
+- **Recipes** — recipe suggestions that fit your goals and targets.
+- **Health dashboard** — an at-a-glance view of the day's calories, macros, weight, and activity.
+- **Activity import** — steps and activity synced from other fitness apps (Apple Health / Health Connect).
+- **Light & dark mode** — full theming support.
 
-2. Start the app
+### Built so far
+- Four-tab navigation (Dashboard, Log, Recipes, Profile) with a shared top header (plan icon · date · profile button).
+- Light/dark theming and the Inter type system.
+- Placeholder screens for each tab — feature work is in progress.
 
-   ```bash
-   npx expo start
-   ```
+### Roadmap / ideas
+Water intake · weight & body-measurement trends with charts · TDEE/BMR calculators with adaptive goals · intermittent-fasting timer · workout/exercise logging with calories burned · saved meals, favorites & meal planning · streaks and reminder notifications · micronutrient targets & insights · progress photos · home-screen widgets · Apple Watch / Wear OS companion · CSV data export · goal-based onboarding · subscription tiers (free / pro / pro max).
 
-In the output, you'll find options to open the app in a
+## Tech stack
 
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
+- **Expo SDK 57**, **React Native 0.86**, **React 19.2**, **expo-router v57**
+- **TypeScript** (strict), **pnpm**
+- **Platforms: iOS and Android only** — there is no web version. (Some `*.web.tsx` files remain from the Expo starter but are not a shipping target.)
+- **Backend:** cloud from the start — authentication, a hosted database, and multi-device sync.
+- **Integrations:** Apple Health (iOS) + Android Health Connect for activity/steps; Open Food Facts + USDA FoodData Central for product/nutrition data and barcodes.
 
-You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
+## Priorities
 
-## Get a fresh project
+**Performance and small app size come first — ahead of animations and heavy assets.** Prefer lightweight dependencies and native primitives (SF Symbols on iOS, Material symbols on Android) over large bundled images or Lottie animations, and keep an eye on bundle/app size as features land.
 
-When you're ready, run:
+## Getting started
 
 ```bash
-npm run reset-project
+pnpm install
 ```
 
-This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
+Run a dev build on a device/emulator (native modules such as native tabs and `expo-symbols` require a dev build, not Expo Go):
 
-### Other setup steps
+```bash
+pnpm ios       # build & run on iOS  (expo run:ios)
+pnpm android   # build & run on Android (expo run:android)
+```
 
-- To set up ESLint for linting, run `npx expo lint`, or follow our guide on ["Using ESLint and Prettier"](https://docs.expo.dev/guides/using-eslint/)
-- If you'd like to set up unit testing, follow our guide on ["Unit Testing with Jest"](https://docs.expo.dev/develop/unit-testing/)
-- Learn more about the TypeScript setup in this template in our guide on ["Using TypeScript"](https://docs.expo.dev/guides/typescript/)
+Checks:
 
-## Learn more
+```bash
+pnpm lint          # ESLint (expo lint)
+npx tsc --noEmit   # type-check
+```
 
-To learn more about developing your project with Expo, look at the following resources:
+There is no `pnpm web` target. Native projects (`ios/`, `android/`) are generated on demand (CNG/prebuild) and are gitignored.
 
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
+## Project structure
 
-## Join the community
+```
+src/
+  app/            file-based routes (expo-router): index (Dashboard), log, recipes, profile, _layout
+  components/     shared UI (app-header, app-tabs, themed-text/-view, placeholder-screen, …)
+  constants/      theme (Colors, Fonts, Spacing)
+  hooks/          use-theme, use-color-scheme
+assets/           fonts (Inter) and images
+```
 
-Join our community of developers creating universal apps.
-
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+See [CLAUDE.md](CLAUDE.md) for architecture details (routing, platform-split components, theming, path aliases) and [AGENTS.md](AGENTS.md) for the Expo SDK 57 docs reminder.

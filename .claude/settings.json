@@ -20,7 +20,12 @@
       "Bash(grep -oE \"\\\\`/[a-z-]*\\\\`|StaticRoutes = [^;]*\" .expo/types/router.d.ts)",
       "Bash(echo \"TSC_EXIT=$?\")",
       "Bash(echo \"LINT_EXIT=$?\")",
-      "Read(//tmp/**)"
+      "Read(//tmp/**)",
+      "Bash(CI=1 EXPO_NO_TELEMETRY=1 npx expo start --port 8099)",
+      "Bash(tee /private/tmp/claude-501/-Users-speed-Documents-GitHub-metabolizm-rn/b07ec0cf-dbf4-4754-be91-f9f868b54d6f/scratchpad/expo-start.log)",
+      "Bash(kill b9yp7lm68 *)",
+      "Bash(pkill -f \"expo start --port 8099\")",
+      "Bash(echo \"lint exit: $?\")"
     ]
   },
   "enabledPlugins": {

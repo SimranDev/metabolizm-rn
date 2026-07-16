@@ -1,0 +1,22 @@
+services:
+  postgres:
+    image: postgres:18-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: metabolizm
+      POSTGRES_PASSWORD: metabolizm
+      POSTGRES_DB: metabolizm
+    ports:
+      - "5432:5432"
+    volumes:
+      # postgres:18 images moved the volume from /var/lib/postgresql/data
+      # to /var/lib/postgresql (PGDATA is /var/lib/postgresql/18/docker).
+      - postgres_data:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U metabolizm -d metabolizm"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  postgres_data:

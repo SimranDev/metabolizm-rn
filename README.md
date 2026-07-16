@@ -16,9 +16,9 @@ A Health & Fitness app for **iOS and Android** — a "swiss-knife for fitness" w
 - **Light & dark mode** — full theming support.
 
 ### Built so far
-- Four-tab navigation (Dashboard, Log, Recipes, Profile) with a shared top header (plan icon · date · profile button).
-- Light/dark theming and the Inter type system.
-- Placeholder screens for each tab — feature work is in progress.
+- Four-tab navigation (Log, Dashboard, Recipes, Profile) with a shared top header (plan icon · date · profile button).
+- Light/dark theming with the "Kinetic" design system (Space Grotesk / Instrument Sans).
+- Goal-based onboarding (BMR/TDEE plans), USDA food search, and an MMKV-persisted food diary; the remaining tabs are placeholders.
 
 ### Roadmap / ideas
 Water intake · weight & body-measurement trends with charts · TDEE/BMR calculators with adaptive goals · intermittent-fasting timer · workout/exercise logging with calories burned · saved meals, favorites & meal planning · streaks and reminder notifications · micronutrient targets & insights · progress photos · home-screen widgets · Apple Watch / Wear OS companion · CSV data export · goal-based onboarding · subscription tiers (free / pro / pro max).
@@ -26,7 +26,7 @@ Water intake · weight & body-measurement trends with charts · TDEE/BMR calcula
 ## Tech stack
 
 - **Expo SDK 57**, **React Native 0.86**, **React 19.2**, **expo-router v57**
-- **TypeScript** (strict), **pnpm**
+- **TypeScript** (strict), **pnpm monorepo** (`apps/mobile` + `packages/shared`)
 - **Platforms: iOS and Android only** — there is no web version. (Some `*.web.tsx` files remain from the Expo starter but are not a shipping target.)
 - **Backend:** cloud from the start — authentication, a hosted database, and multi-device sync.
 - **Integrations:** Apple Health (iOS) + Android Health Connect for activity/steps; Open Food Facts + USDA FoodData Central for product/nutrition data and barcodes.
@@ -51,8 +51,8 @@ pnpm android   # build & run on Android (expo run:android)
 Checks:
 
 ```bash
-pnpm lint          # ESLint (expo lint)
-npx tsc --noEmit   # type-check
+pnpm lint        # ESLint (expo lint)
+pnpm typecheck   # tsc --noEmit in every workspace package
 ```
 
 There is no `pnpm web` target. Native projects (`ios/`, `android/`) are generated on demand (CNG/prebuild) and are gitignored.
@@ -60,12 +60,18 @@ There is no `pnpm web` target. Native projects (`ios/`, `android/`) are generate
 ## Project structure
 
 ```
-src/
-  app/            file-based routes (expo-router): index (Dashboard), log, recipes, profile, _layout
-  components/     shared UI (app-header, app-tabs, themed-text/-view, placeholder-screen, …)
-  constants/      theme (Colors, Fonts, Spacing)
-  hooks/          use-theme, use-color-scheme
-assets/           fonts (Inter) and images
+apps/
+  mobile/           the Expo app
+    src/
+      app/          file-based routes (expo-router): (onboarding), (tabs) — index (Log), dashboard, recipes, profile — add-food, food-detail
+      components/   shared UI (app-header, app-tabs, log/, dashboard/, onboarding/, ui/)
+      hooks/        use-food-search, use-food-detail, use-color-scheme
+      lib/          runtime helpers: food (USDA search), health (BMR/TDEE math), auth
+      store/        zustand stores (diary, profile, onboarding, food-selection)
+      theme/        "Kinetic" design system (palette, typography, tokens, provider)
+    assets/         app icons, splash and images
+packages/
+  shared/           @metabolizm/shared — data types shared with the future backend
 ```
 
 See [CLAUDE.md](CLAUDE.md) for architecture details (routing, platform-split components, theming, path aliases) and [AGENTS.md](AGENTS.md) for the Expo SDK 57 docs reminder.

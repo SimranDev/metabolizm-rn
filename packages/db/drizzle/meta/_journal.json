@@ -15,6 +15,13 @@
       "when": 1784251122594,
       "tag": "0001_food_catalog",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1784273914124,
+      "tag": "0002_food_source_ref",
+      "breakpoints": true
     }
   ]
 }

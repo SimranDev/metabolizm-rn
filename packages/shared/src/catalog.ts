@@ -29,6 +29,8 @@ export type FoodDto = {
   brand: string | null;
   description: string | null;
   barcode: string | null;
+  /** Provenance of imported system rows (e.g. "fdc:2262074"); read-only, null for user foods. */
+  sourceRef: string | null;
   source: FoodSource;
   baseUnit: FoodBaseUnit;
   servingSize: number;

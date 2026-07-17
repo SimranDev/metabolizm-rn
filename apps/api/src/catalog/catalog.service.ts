@@ -99,6 +99,7 @@ function toFoodDto(row: FoodRow, portions: PortionRow[]): FoodDto {
     brand: row.brand,
     description: row.description,
     barcode: row.barcode,
+    sourceRef: row.sourceRef,
     source: row.source,
     baseUnit: row.baseUnit,
     servingSize: row.servingSize,

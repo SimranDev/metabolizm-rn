@@ -42,6 +42,8 @@ export const foods = pgTable(
     brand: text("brand"),
     description: text("description"),
     barcode: text("barcode"),
+    // Provenance of imported system rows, e.g. "fdc:2262074"; null for user foods.
+    sourceRef: text("source_ref"),
     source: foodSourceEnum("source").notNull().default("custom"),
     baseUnit: baseUnitEnum("base_unit").notNull().default("g"),
     servingSize: numeric("serving_size", {
@@ -97,6 +99,9 @@ export const foods = pgTable(
     uniqueIndex("foods_barcode_active_uq")
       .on(t.barcode)
       .where(sql`barcode IS NOT NULL AND deleted_at IS NULL`),
+    uniqueIndex("foods_source_ref_active_uq")
+      .on(t.sourceRef)
+      .where(sql`source_ref IS NOT NULL AND deleted_at IS NULL`),
   ],
 );
 

@@ -1,0 +1,2 @@
+ALTER TABLE "foods" ADD COLUMN "source_ref" text;--> statement-breakpoint
+CREATE UNIQUE INDEX "foods_source_ref_active_uq" ON "foods" USING btree ("source_ref") WHERE source_ref IS NOT NULL AND deleted_at IS NULL;

@@ -159,6 +159,7 @@ async function importFile(db: Database, path: string): Promise<void> {
             nutrients: m.input.nutrients,
             visibility: "public" as const,
             isVerified: true,
+            popularity: m.popularity,
           };
         });
         await tx.insert(foods).values(foodRows);
@@ -167,7 +168,9 @@ async function importFile(db: Database, path: string): Promise<void> {
 
       if (updates.length > 0) {
         // Mirrors the admin PATCH semantics: set all mapped fields, bump
-        // version, replace portions wholesale.
+        // version, replace portions wholesale. popularity is deliberately
+        // NOT set here — it's only seeded on insert, so the fire-and-forget
+        // read bumps accrued in production survive a re-import.
         const updatedIds: string[] = [];
         for (const m of updates) {
           const id = byRef.get(m.sourceRef)!;

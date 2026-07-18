@@ -16,8 +16,18 @@ import {
 } from "@metabolizm/shared";
 import { z } from "zod";
 
+import {
+  EXCLUDED_CATEGORIES,
+  cleanFoodName,
+  cleanPortionLabel,
+  computePopularity,
+  hasBrandToken,
+} from "./usda-clean";
+
 export type UsdaSkipReason =
   | "invalid_shape"
+  | "excluded_category"
+  | "brand_name"
   | "no_energy"
   | "missing_macros"
   | "validation_failed";
@@ -30,6 +40,7 @@ export type UsdaMapResult =
       fdcId: number;
       sourceRef: string;
       input: CreateFoodInput;
+      popularity: number;
       warnings: string[];
       unknownNutrients: UnknownNutrient[];
     }
@@ -180,6 +191,24 @@ export function mapUsdaFood(raw: unknown): UsdaMapResult {
     };
   }
   const food = parsedFood.data;
+
+  // Parity skips (mirror the hand-pruned catalog) before any nutrient work.
+  const categoryDescription =
+    typeof food.foodCategory === "string"
+      ? food.foodCategory.trim()
+      : food.foodCategory?.description?.trim();
+  if (categoryDescription && EXCLUDED_CATEGORIES.has(categoryDescription)) {
+    return {
+      ok: false,
+      reason: "excluded_category",
+      detail: `${categoryDescription}: ${food.description}`,
+    };
+  }
+  let name = cleanFoodName(food.description);
+  if (hasBrandToken(name)) {
+    return { ok: false, reason: "brand_name", detail: name };
+  }
+
   const warnings: string[] = [];
   const unknownNutrients: UnknownNutrient[] = [];
 
@@ -326,19 +355,13 @@ export function mapUsdaFood(raw: unknown): UsdaMapResult {
       label = `${formatQuantity(quantity)} ${parts}`;
     }
     portions.push({
-      label: label.slice(0, 100).trim(),
+      label: cleanPortionLabel(label).slice(0, 100).trim(),
       quantity: roundTo(quantity, 3),
       amountInBase: roundTo(p.gramWeight, 3),
       isDefault: false,
     });
   }
 
-  const categoryDescription =
-    typeof food.foodCategory === "string"
-      ? food.foodCategory.trim()
-      : food.foodCategory?.description?.trim();
-
-  let name = food.description;
   if (name.length > 200) {
     warnings.push(`name truncated to 200 chars`);
     name = name.slice(0, 200).trim();
@@ -370,6 +393,7 @@ export function mapUsdaFood(raw: unknown): UsdaMapResult {
     fdcId: food.fdcId,
     sourceRef: `fdc:${food.fdcId}`,
     input: validated.data,
+    popularity: computePopularity(validated.data.name),
     warnings,
     unknownNutrients,
   };

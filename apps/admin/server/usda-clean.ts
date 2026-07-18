@@ -46,3 +46,43 @@ export function cleanPortionLabel(label: string): string {
     .trim();
   return cleaned === "" ? "1 serving" : cleaned;
 }
+
+/**
+ * FDC categories pruned from the system catalog by hand (2026-07): branded
+ * restaurant/fast-food composites, culturally-narrow survey data, and
+ * categories the app serves better elsewhere. The importer must keep
+ * skipping them or a re-seed would resurrect the pruned rows.
+ */
+export const EXCLUDED_CATEGORIES: ReadonlySet<string> = new Set([
+  "Restaurant Foods",
+  "Fast Foods",
+  "American Indian/Alaska Native Foods",
+  "Baby Foods",
+  "Breakfast Cereals",
+]);
+
+// An ALL-CAPS token of 4+ chars (allowing '&.- inside) marks a brand name
+// in SR Legacy descriptions ("KRAFT", "OSCAR MAYER"); "USDA" (grade
+// labels like "USDA choice") is the one legitimate exception.
+const BRAND_TOKEN = /[A-Z][A-Z'&.-]{2,}[A-Z]/g;
+
+export function hasBrandToken(name: string): boolean {
+  for (const match of name.matchAll(BRAND_TOKEN)) {
+    if (match[0] !== "USDA") return true;
+  }
+  return false;
+}
+
+/**
+ * Search-ranking seed, mirroring the heuristic hand-applied to the live
+ * catalog: whole/raw foods first, plain cooked preparations next, and a
+ * per-comma penalty so simpler names beat qualifier-laden variants.
+ * Negative results are fine.
+ */
+export function computePopularity(name: string): number {
+  let popularity = 0;
+  if (name.toLowerCase().includes(", raw")) popularity += 100;
+  else if (/cooked|boiled|grilled|roasted/i.test(name)) popularity += 40;
+  const commas = name.match(/,/g)?.length ?? 0;
+  return popularity - 5 * commas;
+}

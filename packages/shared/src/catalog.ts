@@ -1,7 +1,7 @@
 /**
  * Food catalog API contract shared between apps/api and apps/mobile.
  * All macro/nutrient values are PER 100 base units (g or ml) — never per
- * serving. Client-side USDA shapes live in food.ts and are a separate concern.
+ * serving; portion math happens at display time.
  */
 import type { NutrientMap } from "./nutrients";
 

@@ -1,11 +1,8 @@
 /**
- * Static config for the "add food" search screen. Live search hits USDA
- * FoodData Central (see `@/lib/food`); the empty-query "recent" list now comes
- * from the persisted diary store (`useDiary().recentFoods`), not from here.
+ * Static config for the "add food" search screen. Live search hits the catalog
+ * API (see `@/lib/api`); the empty-query "recent" list comes from the
+ * persisted diary store (`useDiary().recentFoods`), not from here.
  */
-
-// Re-exported so the food-search UI can keep importing the result type from here.
-export type { FoodAccent, FoodSearchItem } from "@metabolizm/shared";
 
 /** Filters above the results list. Only "All"/"History" show recents for now. */
 export const FOOD_FILTERS = [

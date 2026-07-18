@@ -10,8 +10,8 @@ import { Button } from "@/components/ui/button";
 import { IconButton } from "@/components/ui/icon-button";
 import { Input } from "@/components/ui/input";
 import { useFoodDetail } from "@/hooks/use-food-detail";
-import { scaleNutrition } from "@/lib/food";
-import type { FoodSearchItem, FoodUnit } from "@metabolizm/shared";
+import { buildUnits, displayName, dominantMacro, scaleFood } from "@/lib/food";
+import type { DiaryFood, FoodUnit } from "@metabolizm/shared";
 import { toMealId, useDiary } from "@/store/diary";
 import { useFoodSelection } from "@/store/food-selection";
 import { Spacing, useTheme } from "@/theme";
@@ -20,8 +20,8 @@ import { NutritionFacts } from "./nutrition-facts";
 import { UnitPicker } from "./unit-picker";
 
 type Props = {
-  /** USDA food id to fetch details for. */
-  fdcId: string;
+  /** Catalog food id to fetch details for. */
+  foodId: string;
   /** Meal id from the route — the CTA target / the meal to update in edit mode. */
   meal: string;
   /** "add" configures a new selection; "edit" updates an already-logged entry. */
@@ -46,12 +46,12 @@ function servingText(qty: number, unit: FoodUnit): string {
  * it selected with the chosen amount) or a logged food ("edit" — Save updates the
  * entry in place). Detail data is fetched lazily on open.
  */
-export function FoodDetailScreen({ fdcId, meal, mode, entryId }: Props) {
+export function FoodDetailScreen({ foodId, meal, mode, entryId }: Props) {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { colors } = useTheme();
 
-  const { detail, loading, error, reload } = useFoodDetail(fdcId);
+  const { detail, loading, error, reload } = useFoodDetail(foodId);
   const upsert = useFoodSelection((s) => s.upsert);
   const updateEntry = useDiary((s) => s.updateEntry);
   const existingEntry = useDiary((s) =>
@@ -60,9 +60,13 @@ export function FoodDetailScreen({ fdcId, meal, mode, entryId }: Props) {
       : undefined,
   );
 
-  // Defaults come from the food's own serving (or the logged entry when editing);
-  // overrides track the user's edits, so no init effect / cascading setState.
-  const seedUnit = detail ? detail.units[detail.defaultUnitIndex] ?? detail.units[0] : undefined;
+  // Defaults come from the food's own portions (or the logged entry when
+  // editing); overrides track the user's edits, so no init effect / cascading
+  // setState.
+  const { units, defaultUnitIndex } = detail
+    ? buildUnits(detail)
+    : { units: [] as FoodUnit[], defaultUnitIndex: 0 };
+  const seedUnit = units[defaultUnitIndex] ?? units[0];
   const defaultUnit = existingEntry?.unit ?? seedUnit ?? null;
   const defaultQuantity = existingEntry?.quantity != null ? String(existingEntry.quantity) : "1";
   const [unitOverride, setUnitOverride] = useState<FoodUnit | null>(null);
@@ -72,38 +76,39 @@ export function FoodDetailScreen({ fdcId, meal, mode, entryId }: Props) {
 
   const qty = Number(quantity);
   const validQty = Number.isFinite(qty) && qty > 0;
-  const nutrition = detail && unit ? scaleNutrition(detail.per100g, qty * unit.grams) : null;
-  const canSave = !!detail && !!unit && !!nutrition && validQty;
+  // Amount in base units (g|ml); all catalog values are per 100 of them.
+  const scaled = detail && unit ? scaleFood(detail, qty * unit.grams) : null;
+  const canSave = !!detail && !!unit && !!scaled && validQty;
 
   const onSave = () => {
-    if (!detail || !unit || !nutrition || !validQty) return;
+    if (!detail || !unit || !scaled || !validQty) return;
     const serving = servingText(qty, unit);
     const macros = {
-      proteinG: nutrition.proteinG,
-      carbsG: nutrition.carbsG,
-      fatG: nutrition.fatG,
+      proteinG: scaled.proteinG,
+      carbsG: scaled.carbsG,
+      fatG: scaled.fatG,
     };
     if (mode === "edit" && entryId) {
       updateEntry(toMealId(meal), entryId, {
         serving,
-        calories: nutrition.calories,
+        calories: scaled.calories,
         macros,
         quantity: qty,
         unit,
       });
     } else {
-      const item: FoodSearchItem = {
-        id: detail.id,
-        name: detail.name,
-        calories: nutrition.calories,
+      const food: DiaryFood = {
+        foodId: detail.id,
+        name: displayName(detail.name, detail.brand),
         serving,
+        calories: scaled.calories,
         macros,
-        accent: detail.accent,
-        verified: detail.verified,
+        accent: dominantMacro(detail.proteinG, detail.carbsG, detail.fatG),
+        verified: detail.isVerified,
         quantity: qty,
         unit,
       };
-      upsert(item);
+      upsert(food);
     }
     router.back();
   };
@@ -122,7 +127,7 @@ export function FoodDetailScreen({ fdcId, meal, mode, entryId }: Props) {
         />
 
         <ThemedText type="h3" style={styles.title} numberOfLines={1}>
-          {detail?.name ?? "Nutrition facts"}
+          {detail ? displayName(detail.name, detail.brand) : "Nutrition facts"}
         </ThemedText>
 
         <Button label="Save" size="sm" disabled={!canSave} onPress={onSave} />
@@ -132,7 +137,7 @@ export function FoodDetailScreen({ fdcId, meal, mode, entryId }: Props) {
         <View style={styles.centerState}>
           <ActivityIndicator color={colors.textSecondary} />
         </View>
-      ) : error || !detail || !nutrition || !unit ? (
+      ) : error || !detail || !scaled || !unit ? (
         <View style={styles.centerState}>
           <ThemedText type="sm" themeColor="textSecondary" style={styles.errorText}>
             {error ?? "Couldn't load nutrition details."}
@@ -145,7 +150,14 @@ export function FoodDetailScreen({ fdcId, meal, mode, entryId }: Props) {
             contentContainerStyle={styles.content}
             keyboardShouldPersistTaps="handled"
             showsVerticalScrollIndicator={false}>
-            <NutritionFacts nutrition={nutrition} servingLabel={servingText(qty, unit)} />
+            <NutritionFacts
+              calories={scaled.calories}
+              proteinG={scaled.proteinG}
+              carbsG={scaled.carbsG}
+              fatG={scaled.fatG}
+              nutrients={scaled.nutrients}
+              servingLabel={servingText(qty, unit)}
+            />
           </ScrollView>
 
           <ThemedView
@@ -166,7 +178,7 @@ export function FoodDetailScreen({ fdcId, meal, mode, entryId }: Props) {
               />
             </View>
             <View style={styles.unitCol}>
-              <UnitPicker units={detail.units} value={unit} onChange={setUnitOverride} />
+              <UnitPicker units={units} value={unit} onChange={setUnitOverride} />
             </View>
           </ThemedView>
         </>

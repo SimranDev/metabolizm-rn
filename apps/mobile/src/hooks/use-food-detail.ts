@@ -1,38 +1,38 @@
 import { useCallback, useEffect, useState } from "react";
 
-import { getFoodDetail } from "@/lib/food";
-import type { FoodDetail } from "@metabolizm/shared";
+import { getFood } from "@/lib/api";
+import type { FoodDto } from "@metabolizm/shared";
 
 export type FoodDetailState = {
-  detail: FoodDetail | null;
+  detail: FoodDto | null;
   loading: boolean;
   error: string | null;
   reload: () => void;
 };
 
-type Committed = { key: string; detail: FoodDetail | null; error: string | null };
+type Committed = { key: string; detail: FoodDto | null; error: string | null };
 
 /**
- * Lazily fetch one food's full detail record (per-100g nutrition, micros, and
- * portions) for the nutrition-info screen. `loading`/`error` are derived from a
- * committed result keyed by the request (fdcId + retry) rather than set
+ * Lazily fetch one catalog food's full record (macro columns, nutrients map,
+ * and portions) for the nutrition-info screen. `loading`/`error` are derived
+ * from a committed result keyed by the request (foodId + retry) rather than set
  * synchronously in the effect — mirroring `useFoodSearch`, which keeps the effect
  * free of cascading setState. The in-flight request aborts on unmount / retry.
  */
-export function useFoodDetail(fdcId: string): FoodDetailState {
+export function useFoodDetail(foodId: string): FoodDetailState {
   const [attempt, setAttempt] = useState(0);
-  const key = `${fdcId}#${attempt}`;
+  const key = `${foodId}#${attempt}`;
   const [committed, setCommitted] = useState<Committed>({ key: "", detail: null, error: null });
 
   const reload = useCallback(() => setAttempt((a) => a + 1), []);
 
   useEffect(() => {
-    if (!fdcId) return;
+    if (!foodId) return;
 
     const controller = new AbortController();
     let active = true;
 
-    getFoodDetail(fdcId, { signal: controller.signal })
+    getFood(foodId, { signal: controller.signal })
       .then((result) => {
         if (active) setCommitted({ key, detail: result, error: null });
       })
@@ -52,9 +52,9 @@ export function useFoodDetail(fdcId: string): FoodDetailState {
       active = false;
       controller.abort();
     };
-  }, [fdcId, key]);
+  }, [foodId, key]);
 
-  if (!fdcId) {
+  if (!foodId) {
     return { detail: null, loading: false, error: "Nutrition details aren't available for this item.", reload };
   }
   // Result for the current request hasn't landed yet (in flight).

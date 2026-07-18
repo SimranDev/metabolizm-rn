@@ -9,12 +9,13 @@ import { ThemedView } from "@/components/themed-view";
 import { Button } from "@/components/ui/button";
 import { IconButton } from "@/components/ui/icon-button";
 import { Input } from "@/components/ui/input";
-import { useFoodSearch } from "@/hooks/use-food-search";
+import { MIN_QUERY_LENGTH, useFoodSearch } from "@/hooks/use-food-search";
+import { toQuickAdd } from "@/lib/food";
 import { toMealId, useDiary } from "@/store/diary";
 import { useFoodSelection } from "@/store/food-selection";
 import { macroColor, Radius, Spacing, useTheme } from "@/theme";
 
-import type { FoodSearchItem } from "@metabolizm/shared";
+import type { DiaryFood } from "@metabolizm/shared";
 
 import {
   FOOD_FILTERS,
@@ -30,11 +31,10 @@ type Props = {
 };
 
 /**
- * Food-adding screen shown as a modal from the Log tab's "+" buttons. UI only:
- * the input methods (photo/voice/barcode) are placeholders, search filters a
- * static "recent" list locally, and "Add to {meal}" just dismisses — there is no
- * food database or diary store yet. Elements are wired to state so the real
- * behavior can be dropped in later.
+ * Food-adding screen shown as a modal from the Log tab's "+" buttons. Search
+ * hits the catalog API (see `useFoodSearch`); short/empty queries fall back to
+ * the persisted recents list. The input methods (photo/voice/barcode) are
+ * placeholders. "Add to {meal}" commits the multi-selection to the diary.
  */
 export function AddFoodScreen({ meal }: Props) {
   const router = useRouter();
@@ -53,7 +53,7 @@ export function AddFoodScreen({ meal }: Props) {
   // The multi-select lives in a store (not local state) so the pushed
   // nutrition-info screen can add a configured food to it. Cleared on mount so
   // each add-food session starts fresh; the full items resolve the footer even
-  // for live USDA results whose ids aren't in the recents list.
+  // for live search results whose ids aren't in the recents list.
   const selectedItems = useFoodSelection((s) => s.items);
   const toggle = useFoodSelection((s) => s.toggle);
   const clearSelection = useFoodSelection((s) => s.clear);
@@ -67,12 +67,19 @@ export function AddFoodScreen({ meal }: Props) {
 
   const { items, loading, error } = useFoodSearch(query);
 
-  // Live USDA search when a query is typed; the static RECENT list otherwise.
-  // Meals / My Foods have no data source yet, so they stay empty.
+  // Live catalog search once the query is long enough; the static RECENT list
+  // otherwise. Meals / My Foods have no data source yet, so they stay empty.
+  // Both sources normalize to the quick-add draft the row renders and the "+"
+  // toggle adds: search rows on their default-portion basis, recents as last
+  // logged.
   const trimmed = query.trim();
   const searchable = filter !== "meals" && filter !== "myfoods";
-  const showingSearch = searchable && trimmed.length > 0;
-  const list = !searchable ? [] : showingSearch ? items : recentFoods;
+  const showingSearch = searchable && trimmed.length >= MIN_QUERY_LENGTH;
+  const list: DiaryFood[] = !searchable
+    ? []
+    : showingSearch
+      ? items.map(toQuickAdd)
+      : recentFoods;
 
   const selected = Object.values(selectedItems);
   const selectedCalories = selected.reduce((sum, f) => sum + f.calories, 0);
@@ -146,14 +153,14 @@ export function AddFoodScreen({ meal }: Props) {
             </ThemedText>
             {list.map((item) => (
               <FoodRow
-                key={item.id}
+                key={item.foodId}
                 item={item}
-                selected={!!selectedItems[item.id]}
+                selected={!!selectedItems[item.foodId]}
                 onToggle={() => toggle(item)}
                 onOpen={() =>
                   router.push({
                     pathname: "/food-detail",
-                    params: { fdcId: item.id, meal, mode: "add" },
+                    params: { foodId: item.foodId, meal, mode: "add" },
                   })
                 }
               />
@@ -280,7 +287,7 @@ function FoodRow({
   onToggle,
   onOpen,
 }: {
-  item: FoodSearchItem;
+  item: DiaryFood;
   selected: boolean;
   onToggle: () => void;
   onOpen: () => void;

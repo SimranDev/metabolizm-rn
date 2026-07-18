@@ -77,14 +77,14 @@ export function MealSection({ meal }: Props) {
 function FoodEntryRow({ entry, mealId }: { entry: DiaryEntry; mealId: MealId }) {
   const { colors } = useTheme();
   const router = useRouter();
-  // Only foods logged with a USDA id can be reopened for editing; leave older
-  // entries (logged before quantity/unit tracking) inert.
-  const fdcId = entry.fdcId;
-  const onPress = fdcId
+  // Only foods logged with a catalog id can be reopened for editing; entries
+  // without one (pre-catalog logs) stay inert.
+  const foodId = entry.foodId;
+  const onPress = foodId
     ? () =>
         router.push({
           pathname: "/food-detail",
-          params: { fdcId, meal: mealId, mode: "edit", entryId: entry.entryId },
+          params: { foodId, meal: mealId, mode: "edit", entryId: entry.entryId },
         })
     : undefined;
   return (

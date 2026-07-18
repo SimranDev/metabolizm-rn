@@ -8,32 +8,32 @@
 
 import { create } from "zustand";
 
-import type { FoodSearchItem } from "@metabolizm/shared";
+import type { DiaryFood } from "@metabolizm/shared";
 
 type FoodSelectionState = {
-  items: Record<string, FoodSearchItem>;
-  /** Add/remove by id — the "+" quick-add on a search row. */
-  toggle: (item: FoodSearchItem) => void;
-  /** Add or replace by id — the nutrition-info screen's "Save" (with chosen amount). */
-  upsert: (item: FoodSearchItem) => void;
-  remove: (id: string) => void;
+  items: Record<string, DiaryFood>;
+  /** Add/remove by food id — the "+" quick-add on a search row. */
+  toggle: (food: DiaryFood) => void;
+  /** Add or replace by food id — the nutrition-info screen's "Save" (with chosen amount). */
+  upsert: (food: DiaryFood) => void;
+  remove: (foodId: string) => void;
   clear: () => void;
 };
 
 export const useFoodSelection = create<FoodSelectionState>((set) => ({
   items: {},
-  toggle: (item) =>
+  toggle: (food) =>
     set((state) => {
-      if (state.items[item.id]) {
-        const { [item.id]: _removed, ...rest } = state.items;
+      if (state.items[food.foodId]) {
+        const { [food.foodId]: _removed, ...rest } = state.items;
         return { items: rest };
       }
-      return { items: { ...state.items, [item.id]: item } };
+      return { items: { ...state.items, [food.foodId]: food } };
     }),
-  upsert: (item) => set((state) => ({ items: { ...state.items, [item.id]: item } })),
-  remove: (id) =>
+  upsert: (food) => set((state) => ({ items: { ...state.items, [food.foodId]: food } })),
+  remove: (foodId) =>
     set((state) => {
-      const { [id]: _removed, ...rest } = state.items;
+      const { [foodId]: _removed, ...rest } = state.items;
       return { items: rest };
     }),
   clear: () => set({ items: {} }),

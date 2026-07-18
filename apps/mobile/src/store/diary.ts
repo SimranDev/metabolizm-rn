@@ -16,8 +16,8 @@ import { createJSONStorage, persist } from "zustand/middleware";
 
 import type {
   DiaryEntry,
+  DiaryFood,
   EntryPatch,
-  FoodSearchItem,
   Macros,
   Meal,
   MealId,
@@ -63,13 +63,13 @@ function pruneDays(byDate: Record<string, EntriesByMeal>): Record<string, Entrie
   return Object.fromEntries(keep.map((k) => [k, byDate[k]]));
 }
 
-/** Prepend newly logged foods to recents, deduped by id (newest wins), capped. */
-function addRecents(recents: FoodSearchItem[], foods: FoodSearchItem[]): FoodSearchItem[] {
+/** Prepend newly logged foods to recents, deduped by food id (newest wins), capped. */
+function addRecents(recents: DiaryFood[], foods: DiaryFood[]): DiaryFood[] {
   const seen = new Set<string>();
-  const deduped: FoodSearchItem[] = [];
+  const deduped: DiaryFood[] = [];
   for (const food of [...foods, ...recents]) {
-    if (seen.has(food.id)) continue;
-    seen.add(food.id);
+    if (seen.has(food.foodId)) continue;
+    seen.add(food.foodId);
     deduped.push(food);
   }
   return deduped.slice(0, MAX_RECENTS);
@@ -78,12 +78,12 @@ function addRecents(recents: FoodSearchItem[], foods: FoodSearchItem[]): FoodSea
 /** Fields written to disk; `currentDate` is derived fresh each launch, not persisted. */
 type PersistedDiary = {
   entriesByDate: Record<string, EntriesByMeal>;
-  recentFoods: FoodSearchItem[];
+  recentFoods: DiaryFood[];
 };
 
 type DiaryState = PersistedDiary & {
   currentDate: string;
-  addEntries: (mealId: MealId, foods: FoodSearchItem[]) => void;
+  addEntries: (mealId: MealId, foods: DiaryFood[]) => void;
   updateEntry: (mealId: MealId, entryId: string, patch: EntryPatch) => void;
   removeEntry: (mealId: MealId, entryId: string) => void;
   setDate: (date: string) => void;
@@ -103,15 +103,7 @@ export const useDiary = create<DiaryState>()(
           const day = state.entriesByDate[state.currentDate] ?? emptyEntries();
           const added = foods.map<DiaryEntry>((food) => ({
             entryId: makeEntryId(),
-            name: food.name,
-            serving: food.serving,
-            calories: food.calories,
-            macros: food.macros,
-            accent: food.accent,
-            verified: food.verified,
-            fdcId: food.id,
-            quantity: food.quantity,
-            unit: food.unit,
+            ...food,
           }));
           return {
             entriesByDate: pruneDays({
@@ -153,12 +145,36 @@ export const useDiary = create<DiaryState>()(
     }),
     {
       name: "metabolizm-diary",
-      version: 1,
+      version: 2,
       storage: createJSONStorage(() => zustandMmkvStorage),
       partialize: (state): PersistedDiary => ({
         entriesByDate: state.entriesByDate,
         recentFoods: state.recentFoods,
       }),
+      // v1 stored USDA data: `entry.fdcId` held an FDC id (doesn't resolve
+      // against the catalog API) and recents held the old search-item shape.
+      // Keep the entries — their display fields are denormalized — but drop
+      // the dead ids (those entries become non-editable, which the Log UI
+      // already handles) and clear the recents.
+      migrate: (persisted, version): PersistedDiary => {
+        const saved = (persisted ?? {}) as PersistedDiary;
+        if (version >= 2) return saved;
+        const v1 = (persisted ?? {}) as {
+          entriesByDate?: Record<string, Record<string, (DiaryEntry & { fdcId?: string })[]>>;
+        };
+        const entriesByDate = Object.fromEntries(
+          Object.entries(v1.entriesByDate ?? {}).map(([date, day]) => [
+            date,
+            Object.fromEntries(
+              Object.entries(day).map(([mealId, entries]) => [
+                mealId,
+                entries.map(({ fdcId: _stale, ...entry }) => entry),
+              ]),
+            ),
+          ]),
+        ) as Record<string, EntriesByMeal>;
+        return { entriesByDate, recentFoods: [] };
+      },
       // Prune the window and reset the selected day to today on every hydrate.
       merge: (persisted, current) => {
         const saved = (persisted ?? {}) as Partial<PersistedDiary>;

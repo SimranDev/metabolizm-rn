@@ -17,7 +17,7 @@ import {
 import * as AppleAuthentication from 'expo-apple-authentication';
 import { Platform } from 'react-native';
 
-import { authClient } from './client';
+import { authClient, clearStoredSession } from './client';
 
 export type AuthUser = { email: string };
 
@@ -158,6 +158,10 @@ export async function signOut(): Promise<void> {
     await authClient.signOut();
   } catch {
     // Best effort — the server session expires on its own.
+  } finally {
+    // The app must drop the session immediately even when the server call
+    // fails (offline); on success this is a no-op re-delete.
+    await clearStoredSession().catch(() => {});
   }
 }
 

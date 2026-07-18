@@ -37,6 +37,12 @@ export function createAuth(db: Database, config: ConfigService<Env, true>) {
       // Matches the mobile client's validation.
       minPasswordLength: 8,
     },
+    session: {
+      // Signed short-lived session_data cookie: requests within maxAge skip
+      // the sessions lookup in SessionGuard. Trade-off: a revoked session
+      // stays usable on API calls for up to maxAge.
+      cookieCache: { enabled: true, maxAge: 5 * 60 },
+    },
     socialProviders: {
       ...(appleClientId
         ? {

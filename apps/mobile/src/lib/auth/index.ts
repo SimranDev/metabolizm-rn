@@ -15,6 +15,7 @@ import {
   statusCodes,
 } from '@react-native-google-signin/google-signin';
 import * as AppleAuthentication from 'expo-apple-authentication';
+import * as Crypto from 'expo-crypto';
 import { Platform } from 'react-native';
 
 import { authClient, clearStoredSession } from './client';
@@ -80,6 +81,14 @@ export async function signInWithApple(): Promise<AuthUser | null> {
   if (Platform.OS !== 'ios') {
     throw new Error('Apple sign-in is only available on iOS.');
   }
+  // Replay protection: Apple gets the SHA-256 (hex) of a random nonce and
+  // embeds it in the identity token; the server re-hashes the raw nonce we
+  // send and compares (better-auth nonceMatches).
+  const rawNonce = Crypto.randomUUID();
+  const hashedNonce = await Crypto.digestStringAsync(
+    Crypto.CryptoDigestAlgorithm.SHA256,
+    rawNonce,
+  );
   let credential: AppleAuthentication.AppleAuthenticationCredential;
   try {
     credential = await AppleAuthentication.signInAsync({
@@ -87,6 +96,7 @@ export async function signInWithApple(): Promise<AuthUser | null> {
         AppleAuthentication.AppleAuthenticationScope.FULL_NAME,
         AppleAuthentication.AppleAuthenticationScope.EMAIL,
       ],
+      nonce: hashedNonce,
     });
   } catch (e) {
     if ((e as { code?: string }).code === 'ERR_REQUEST_CANCELED') return null;
@@ -95,11 +105,9 @@ export async function signInWithApple(): Promise<AuthUser | null> {
   if (!credential.identityToken) {
     throw new Error('Apple sign-in failed. Please try again.');
   }
-  // TODO(auth-hardening): pass a hashed nonce to signInAsync and the raw one
-  // here (needs expo-crypto) to prevent identity-token replay.
   const { data, error } = await authClient.signIn.social({
     provider: 'apple',
-    idToken: { token: credential.identityToken },
+    idToken: { token: credential.identityToken, nonce: rawNonce },
   });
   if (error || !data) throw authError(error, 'Apple sign-in failed. Please try again.');
   return sessionUser();

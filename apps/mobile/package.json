@@ -41,9 +41,11 @@
     "typescript": "~6.0.3"
   },
   "scripts": {
-    "start": "expo start",
+    "start": "expo start --dev-client",
+    "start:inspect": "lsof -ti tcp:8081 | xargs kill; EXPO_PUBLIC_USE_RN_FETCH=1 expo start --dev-client --clear",
     "reset-project": "node ./scripts/reset-project.js",
     "android": "expo run:android",
+    "android:inspect": "lsof -ti tcp:8081 | xargs kill; EXPO_PUBLIC_USE_RN_FETCH=1 expo run:android --no-bundler && EXPO_PUBLIC_USE_RN_FETCH=1 expo start --dev-client --clear",
     "ios": "expo run:ios",
     "web": "expo start --web",
     "lint": "expo lint",

@@ -176,7 +176,25 @@
       "Bash(git commit -m 'refactor\\(db\\): extract Drizzle schema + migrations into @metabolizm/db *)",
       "Bash(git commit -m 'refactor\\(shared\\): move catalog food-input zod schemas into shared *)",
       "Bash(git commit -m 'feat\\(db\\): add foods.source_ref for import provenance *)",
-      "Bash(git commit -m 'feat\\(admin\\): internal food-catalog admin tool + USDA bulk import *)"
+      "Bash(git commit -m 'feat\\(admin\\): internal food-catalog admin tool + USDA bulk import *)",
+      "Bash(ls /Applications/ | grep -iE 'docker|orbstack' ; which colima docker 2>/dev/null)",
+      "Bash(lsof -nP -iTCP:8082 -sTCP:LISTEN)",
+      "Bash(~/Library/Android/sdk/platform-tools/adb devices *)",
+      "Bash(curl -s http://localhost:8081/json/list)",
+      "Bash(adb reverse *)",
+      "Bash(git -C /Users/speed/Documents/GitHub/metabolizm-rn status --short)",
+      "Bash(node -e \"require\\('/Users/speed/Documents/GitHub/metabolizm-rn/package.json'\\); require\\('/Users/speed/Documents/GitHub/metabolizm-rn/apps/mobile/package.json'\\); console.log\\('both valid'\\)\")",
+      "Bash(node -e \"require\\('/Users/speed/Documents/GitHub/metabolizm-rn/package.json'\\); require\\('/Users/speed/Documents/GitHub/metabolizm-rn/apps/mobile/package.json'\\); console.log\\('json valid'\\)\")",
+      "Bash(pnpm --filter api typecheck)",
+      "Bash(curl -s -m 2 http://localhost:3000/v1/health)",
+      "Bash(curl -s -o /dev/null -w \"blank q status: %{http_code}\\\\n\" 'http://localhost:3000/v1/catalog/foods?q=%20%20&limit=5')",
+      "Bash(curl -s 'http://localhost:3000/v1/catalog/foods?q=chi&limit=5')",
+      "Bash(/opt/homebrew/bin/jq -r '.items[].name')",
+      "Bash(python3 -c \"import json,sys; d=json.load\\(sys.stdin\\); [print\\(i['name']\\) for i in d['items']]\")",
+      "Bash(curl -s 'http://localhost:3000/v1/catalog/foods?q=icken&limit=5')",
+      "Bash(python3 -c \"import json,sys; d=json.load\\(sys.stdin\\); [print\\(i['name']\\) for i in d['items']]; print\\('count:', len\\(d['items']\\)\\)\")",
+      "Bash(python3 -)",
+      "Bash(git commit -m ' *)"
     ]
   },
   "enabledPlugins": {

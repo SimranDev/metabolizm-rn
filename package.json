@@ -5,8 +5,10 @@
   "packageManager": "pnpm@10.21.0",
   "scripts": {
     "start": "pnpm --filter mobile start",
+    "start:inspect": "pnpm --filter mobile start:inspect",
     "ios": "pnpm --filter mobile ios",
     "android": "pnpm --filter mobile android",
+    "android:inspect": "pnpm --filter mobile android:inspect",
     "api": "pnpm --filter @metabolizm/shared build && pnpm --filter @metabolizm/db build && pnpm --filter api start:dev",
     "api:build": "pnpm --filter api... build",
     "admin": "pnpm --filter @metabolizm/shared build && pnpm --filter @metabolizm/db build && pnpm --filter admin dev",

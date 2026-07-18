@@ -3,6 +3,7 @@ import { useState } from 'react';
 import { StyleSheet } from 'react-native';
 
 import { OnboardingScaffold } from '@/components/onboarding/onboarding-scaffold';
+import { SocialAuthButtons } from '@/components/onboarding/social-auth-buttons';
 import { Input } from '@/components/ui/input';
 import { ThemedText } from '@/components/themed-text';
 import { signIn } from '@/lib/auth';
@@ -16,21 +17,25 @@ export default function SignInScreen() {
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
+  const onSignedIn = () => {
+    haptics.success();
+    // TODO(server-profile): fetch the user's saved profile from the backend
+    // and skip onboarding once the endpoint exists. Locally, restore a
+    // profile if this device has one, otherwise send them through setup.
+    const existing = useProfile.getState().profile;
+    if (existing) {
+      useProfile.getState().completeOnboarding(existing);
+    } else {
+      router.replace('/goal');
+    }
+  };
+
   const onSubmit = async () => {
     setError(null);
     setSubmitting(true);
     try {
       await signIn(email, password);
-      haptics.success();
-      // STUB: with a real backend we'd fetch the user's saved profile here and
-      // skip onboarding. Locally, restore a profile if this device has one,
-      // otherwise send them through setup.
-      const existing = useProfile.getState().profile;
-      if (existing) {
-        useProfile.getState().completeOnboarding(existing);
-      } else {
-        router.replace('/goal');
-      }
+      onSignedIn();
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Something went wrong.');
       setSubmitting(false);
@@ -45,6 +50,21 @@ export default function SignInScreen() {
       nextLabel={submitting ? 'Signing in…' : 'Sign in'}
       nextDisabled={submitting || !email || !password}
       onNext={onSubmit}>
+      <SocialAuthButtons
+        mode="sign-in"
+        busy={submitting}
+        onStart={() => {
+          setError(null);
+          setSubmitting(true);
+        }}
+        onSuccess={onSignedIn}
+        onCancel={() => setSubmitting(false)}
+        onError={(message) => {
+          setError(message);
+          setSubmitting(false);
+        }}
+      />
+
       <Input
         label="Email"
         value={email}

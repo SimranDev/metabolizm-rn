@@ -4,9 +4,10 @@ import { StyleSheet } from 'react-native';
 
 import { LiveReadout } from '@/components/onboarding/live-readout';
 import { OnboardingScaffold } from '@/components/onboarding/onboarding-scaffold';
+import { SocialAuthButtons } from '@/components/onboarding/social-auth-buttons';
 import { Input } from '@/components/ui/input';
 import { ThemedText } from '@/components/themed-text';
-import { signUp } from '@/lib/auth';
+import { signUp, type AuthUser } from '@/lib/auth';
 import { haptics } from '@/lib/haptics';
 import { buildMetrics, resolveSelectedPlan } from '@/lib/onboarding-metrics';
 import { useOnboarding } from '@/store/onboarding';
@@ -38,30 +39,35 @@ export default function SignUpScreen() {
 
   const plan = resolveSelectedPlan(answers, metrics);
 
+  // Shared by the email and social paths: the account exists — persist the
+  // plan and flip the root gate to the app (also clears in-progress answers).
+  const finishOnboarding = (user: AuthUser) => {
+    const profile: Profile = {
+      goal: metrics.goal,
+      sex: metrics.sex,
+      dob: answers.dob!,
+      heightCm: metrics.heightCm,
+      weightKg: metrics.weightKg,
+      goalWeightKg: metrics.goalWeightKg,
+      activityLevel: metrics.activityLevel,
+      weightUnit: answers.weightUnit,
+      heightUnit: answers.heightUnit,
+      email: user.email,
+      planId: plan.id,
+      targetCalories: plan.targetCalories,
+      macros: plan.macros,
+    };
+    haptics.success();
+    completeOnboarding(profile);
+    answers.reset();
+  };
+
   const onSubmit = async () => {
     setError(null);
     setSubmitting(true);
     try {
       const user = await signUp(email, password);
-      const profile: Profile = {
-        goal: metrics.goal,
-        sex: metrics.sex,
-        dob: answers.dob!,
-        heightCm: metrics.heightCm,
-        weightKg: metrics.weightKg,
-        goalWeightKg: metrics.goalWeightKg,
-        activityLevel: metrics.activityLevel,
-        weightUnit: answers.weightUnit,
-        heightUnit: answers.heightUnit,
-        email: user.email,
-        planId: plan.id,
-        targetCalories: plan.targetCalories,
-        macros: plan.macros,
-      };
-      haptics.success();
-      // Flips the root gate to the app; also clears the in-progress answers.
-      completeOnboarding(profile);
-      answers.reset();
+      finishOnboarding(user);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Something went wrong.');
       setSubmitting(false);
@@ -81,6 +87,21 @@ export default function SignUpScreen() {
           { label: 'Daily target', value: `${plan.targetCalories.toLocaleString()} cal` },
           { label: 'Plan', value: plan.label },
         ]}
+      />
+
+      <SocialAuthButtons
+        mode="sign-up"
+        busy={submitting}
+        onStart={() => {
+          setError(null);
+          setSubmitting(true);
+        }}
+        onSuccess={finishOnboarding}
+        onCancel={() => setSubmitting(false)}
+        onError={(message) => {
+          setError(message);
+          setSubmitting(false);
+        }}
       />
 
       <Input

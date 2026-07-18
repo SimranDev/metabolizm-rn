@@ -43,6 +43,7 @@ type PortionRow = typeof foodPortions.$inferSelect;
 // Last row's sort key; keyset pagination over the search ORDER BY.
 const cursorSchema = z.object({
   own: z.union([z.literal(0), z.literal(1)]),
+  pre: z.union([z.literal(0), z.literal(1)]),
   ver: z.union([z.literal(0), z.literal(1)]),
   pop: z.number().int(),
   name: z.string(),
@@ -192,6 +193,12 @@ export class CatalogService {
       ? sql<number>`case when ${foods.ownerId} = ${userId} then 1 else 0 end`
       : sql<number>`0::int`;
     const verifiedRank = sql<number>`case when ${foods.isVerified} then 1 else 0 end`;
+    // Prefix tier: a name starting with q outranks a mere substring match no
+    // matter the popularity ("Apples, raw" above "Pineapple, raw" for
+    // q=apple). Constant when q is absent, same cast rationale as ownRank.
+    const prefixRank = query.q
+      ? sql<number>`(lower(${foods.name}) like ${escapeLike(query.q.toLowerCase()) + "%"})::int`
+      : sql<number>`0::int`;
     const cursor = query.cursor ? decodeCursor(query.cursor) : null;
 
     const filters: SQL[] = [isNull(foods.deletedAt)];
@@ -211,14 +218,15 @@ export class CatalogService {
       );
     }
     if (cursor) {
-      // Mixed sort directions (DESC,DESC,DESC,ASC,ASC) rule out a tuple
+      // Mixed sort directions (DESC ×4, ASC ×2) rule out a tuple
       // comparison; expand the lexicographic "after" predicate instead.
       filters.push(sql`(
         ${ownRank} < ${cursor.own}
-        or (${ownRank} = ${cursor.own} and (${verifiedRank} < ${cursor.ver}
-          or (${verifiedRank} = ${cursor.ver} and (${foods.popularity} < ${cursor.pop}
-            or (${foods.popularity} = ${cursor.pop} and (${foods.name} > ${cursor.name}
-              or (${foods.name} = ${cursor.name} and ${foods.id} > ${cursor.id}::uuid)))))))
+        or (${ownRank} = ${cursor.own} and (${prefixRank} < ${cursor.pre}
+          or (${prefixRank} = ${cursor.pre} and (${verifiedRank} < ${cursor.ver}
+            or (${verifiedRank} = ${cursor.ver} and (${foods.popularity} < ${cursor.pop}
+              or (${foods.popularity} = ${cursor.pop} and (${foods.name} > ${cursor.name}
+                or (${foods.name} = ${cursor.name} and ${foods.id} > ${cursor.id}::uuid)))))))))
       )`);
     }
 
@@ -238,12 +246,16 @@ export class CatalogService {
         fatG: foods.fatG,
         isVerified: foods.isVerified,
         popularity: foods.popularity,
+        // Selected (not recomputed in JS for the cursor) so Postgres lower()
+        // and JS toLowerCase() can never disagree on the same row.
+        pre: prefixRank.as("pre"),
         // nutrients jsonb deliberately excluded from list results
       })
       .from(foods)
       .where(and(...filters))
       .orderBy(
         desc(ownRank),
+        desc(prefixRank),
         desc(foods.isVerified),
         desc(foods.popularity),
         asc(foods.name),
@@ -257,6 +269,7 @@ export class CatalogService {
       rows.length > query.limit && last
         ? encodeCursor({
             own: userId !== null && last.ownerId === userId ? 1 : 0,
+            pre: last.pre ? 1 : 0,
             ver: last.isVerified ? 1 : 0,
             pop: last.popularity,
             name: last.name,

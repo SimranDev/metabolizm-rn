@@ -22,9 +22,9 @@ export default function AppTabs() {
         <NativeTabs.Trigger.Icon sf="square.and.pencil" md="edit_note" />
       </NativeTabs.Trigger>
 
-      <NativeTabs.Trigger name="dashboard">
-        <NativeTabs.Trigger.Label>Dashboard</NativeTabs.Trigger.Label>
-        <NativeTabs.Trigger.Icon sf="square.grid.2x2.fill" md="dashboard" />
+      <NativeTabs.Trigger name="vitals">
+        <NativeTabs.Trigger.Label>Vitals</NativeTabs.Trigger.Label>
+        <NativeTabs.Trigger.Icon sf="waveform.path.ecg" md="monitor_heart" />
       </NativeTabs.Trigger>
 
       <NativeTabs.Trigger name="groups">

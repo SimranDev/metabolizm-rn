@@ -36,6 +36,13 @@
       "when": 1784417278063,
       "tag": "0004_diary",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1784511275076,
+      "tag": "0005_groups",
+      "breakpoints": true
     }
   ]
 }

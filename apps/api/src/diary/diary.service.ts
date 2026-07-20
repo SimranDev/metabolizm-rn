@@ -21,6 +21,7 @@ import {
 
 import { isPgError } from "../common/pg-error";
 import { DB, type Database } from "../db/db.module";
+import { SummariesService } from "../summaries/summaries.service";
 import type { DiaryDaysQuery } from "./diary.schemas";
 
 type DiaryRow = typeof diaryEntries.$inferSelect;
@@ -51,7 +52,10 @@ export function toDiaryEntryDto(row: DiaryRow): DiaryEntryDto {
 
 @Injectable()
 export class DiaryService {
-  constructor(@Inject(DB) private readonly db: Database) {}
+  constructor(
+    @Inject(DB) private readonly db: Database,
+    private readonly summaries: SummariesService,
+  ) {}
 
   /**
    * Atomic batch upsert: insert or overwrite-by-id, LWW on receipt order.
@@ -66,13 +70,20 @@ export class DiaryService {
     try {
       const rows = await this.db.transaction(async (tx) => {
         const owners = await tx
-          .select({ id: diaryEntries.id, userId: diaryEntries.userId })
+          .select({
+            id: diaryEntries.id,
+            userId: diaryEntries.userId,
+            entryDate: diaryEntries.entryDate,
+          })
           .from(diaryEntries)
           .where(inArray(diaryEntries.id, ids));
         if (owners.some((row) => row.userId !== userId)) {
           // Same 404 as a missing entry — never reveal that the id exists.
           throw new NotFoundException("Entry not found");
         }
+        // Pre-write dates too: an upsert can move an entry across days, and
+        // the day it left must be recomputed as well.
+        const affectedDates = new Set<string>(owners.map((r) => r.entryDate));
         const written: DiaryRow[] = [];
         for (const entry of entries) {
           // updated_at is always set here (JS Date, ms precision) instead of
@@ -110,7 +121,9 @@ export class DiaryService {
             })
             .returning();
           written.push(row);
+          affectedDates.add(row.entryDate);
         }
+        await this.summaries.recomputeDays(tx, userId, affectedDates);
         return written;
       });
       return rows.map(toDiaryEntryDto);
@@ -153,20 +166,26 @@ export class DiaryService {
    * row, and outbox replays / offline add-then-delete need no special cases.
    */
   async deleteEntry(userId: string, id: string): Promise<void> {
-    await this.db
-      .update(diaryEntries)
-      .set({
-        deletedAt: new Date(),
-        updatedAt: new Date(),
-        version: sql`${diaryEntries.version} + 1`,
-      })
-      .where(
-        and(
-          eq(diaryEntries.id, id),
-          eq(diaryEntries.userId, userId),
-          isNull(diaryEntries.deletedAt),
-        ),
-      );
+    await this.db.transaction(async (tx) => {
+      const [tombstoned] = await tx
+        .update(diaryEntries)
+        .set({
+          deletedAt: new Date(),
+          updatedAt: new Date(),
+          version: sql`${diaryEntries.version} + 1`,
+        })
+        .where(
+          and(
+            eq(diaryEntries.id, id),
+            eq(diaryEntries.userId, userId),
+            isNull(diaryEntries.deletedAt),
+          ),
+        )
+        .returning({ entryDate: diaryEntries.entryDate });
+      if (tombstoned) {
+        await this.summaries.recomputeDay(tx, userId, tombstoned.entryDate);
+      }
+    });
   }
 
   /** Most recent active entry per distinct food (non-null foodId), newest first. */

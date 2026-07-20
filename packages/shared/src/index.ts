@@ -6,3 +6,5 @@ export * from "./nutrients";
 export * from "./catalog";
 export * from "./catalog-schemas";
 export * from "./diary-schemas";
+export * from "./groups";
+export * from "./groups-schemas";

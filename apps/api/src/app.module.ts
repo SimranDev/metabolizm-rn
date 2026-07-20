@@ -7,7 +7,9 @@ import { CatalogModule } from "./catalog/catalog.module";
 import { validateEnv } from "./config/env";
 import { DbModule } from "./db/db.module";
 import { DiaryModule } from "./diary/diary.module";
+import { GroupsModule } from "./groups/groups.module";
 import { HealthModule } from "./health/health.module";
+import { SummariesModule } from "./summaries/summaries.module";
 import { SyncModule } from "./sync/sync.module";
 
 @Module({
@@ -18,6 +20,8 @@ import { SyncModule } from "./sync/sync.module";
     AuthModule,
     CatalogModule,
     DiaryModule,
+    SummariesModule,
+    GroupsModule,
     SyncModule,
     BillingModule,
   ],

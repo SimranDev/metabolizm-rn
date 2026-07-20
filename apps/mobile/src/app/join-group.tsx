@@ -2,7 +2,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useState } from 'react';
 import { ActivityIndicator, ScrollView, StyleSheet, View } from 'react-native';
 
-import { GroupScreenHeader } from '@/components/groups/screen-header';
+import { ScreenHeader } from '@/components/ui/screen-header';
 import { ShareToggles } from '@/components/groups/share-toggles';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
@@ -31,7 +31,7 @@ export default function JoinGroupScreen() {
 
   return (
     <ThemedView style={styles.container}>
-      <GroupScreenHeader title="Join a group" dismissLabel="Cancel" />
+      <ScreenHeader title="Join a group" dismissLabel="Cancel" />
       {token ? (
         <ConsentView token={token} onReset={() => setToken('')} />
       ) : (

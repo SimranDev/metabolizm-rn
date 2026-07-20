@@ -7,8 +7,8 @@ import { FeedList } from '@/components/groups/feed-list';
 import { LeaderboardList } from '@/components/groups/leaderboard-list';
 import { MembersList } from '@/components/groups/members-list';
 import { RosterList } from '@/components/groups/roster-list';
-import { GroupScreenHeader } from '@/components/groups/screen-header';
-import { Segmented } from '@/components/groups/segmented';
+import { ScreenHeader } from '@/components/ui/screen-header';
+import { Segmented } from '@/components/ui/segmented';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { IconButton } from '@/components/ui/icon-button';
@@ -94,7 +94,7 @@ export default function GroupDetailScreen() {
 
   return (
     <ThemedView style={styles.container}>
-      <GroupScreenHeader
+      <ScreenHeader
         title={summary?.name ?? 'Group'}
         subtitle={
           summary

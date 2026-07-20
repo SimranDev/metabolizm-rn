@@ -2,7 +2,7 @@ import { useRouter } from 'expo-router';
 import { useState } from 'react';
 import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, View } from 'react-native';
 
-import { GroupScreenHeader } from '@/components/groups/screen-header';
+import { ScreenHeader } from '@/components/ui/screen-header';
 import { OptionCard } from '@/components/onboarding/option-card';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
@@ -45,7 +45,7 @@ export default function CreateGroupScreen() {
 
   return (
     <ThemedView style={styles.container}>
-      <GroupScreenHeader title="New group" dismissLabel="Cancel" />
+      <ScreenHeader title="New group" dismissLabel="Cancel" />
 
       <KeyboardAvoidingView
         style={styles.flex}

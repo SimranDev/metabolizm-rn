@@ -7,8 +7,8 @@ import { CommentThread } from '@/components/groups/comment-thread';
 import { MacroLines } from '@/components/groups/macro-lines';
 import { HitChip } from '@/components/groups/member-day-card';
 import { LockNote, NotSharedChip } from '@/components/groups/not-shared';
-import { GroupScreenHeader } from '@/components/groups/screen-header';
-import { ProgressBar } from '@/components/dashboard/progress-bar';
+import { ScreenHeader } from '@/components/ui/screen-header';
+import { ProgressBar } from '@/components/ui/progress-bar';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Badge } from '@/components/ui/badge';
@@ -67,7 +67,7 @@ export default function MemberDayScreen() {
 
   return (
     <ThemedView style={styles.container}>
-      <GroupScreenHeader
+      <ScreenHeader
         title={card ? (isMe ? 'You' : card.name) : 'Member'}
         subtitle={summary ? `${summary.name} · ${dayLabel(day)}` : dayLabel(day)}
       />

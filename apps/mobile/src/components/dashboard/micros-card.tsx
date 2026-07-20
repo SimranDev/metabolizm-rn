@@ -1,6 +1,6 @@
 import { StyleSheet, View } from 'react-native';
 
-import { ProgressBar } from '@/components/dashboard/progress-bar';
+import { ProgressBar } from '@/components/ui/progress-bar';
 import type { MicroSample } from '@/components/dashboard/sample-data';
 import { ThemedText } from '@/components/themed-text';
 import { Badge } from '@/components/ui/badge';

@@ -10,7 +10,7 @@ type Props<T extends string> = {
   onChange: (value: T) => void;
 };
 
-/** Segmented control for the in-group tabs (Today / Leaderboard / Members). */
+/** Segmented control — in-group tabs, chart ranges, unit toggles. */
 export function Segmented<T extends string>({ options, value, onChange }: Props<T>) {
   const { colors } = useTheme();
 

@@ -18,11 +18,11 @@ type Props = {
 };
 
 /**
- * Header for group routes. These push at the ROOT stack (outside the tab
- * group), so the persistent AppHeader isn't present and each screen carries
- * its own title and back affordance.
+ * Header for routes that push at the ROOT stack (groups drill-downs, the
+ * weight screens). Outside the tab group the persistent AppHeader isn't
+ * present, so each of those screens carries its own title and back affordance.
  */
-export function GroupScreenHeader({ title, subtitle, action, dismissLabel }: Props) {
+export function ScreenHeader({ title, subtitle, action, dismissLabel }: Props) {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { colors } = useTheme();

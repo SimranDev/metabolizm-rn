@@ -1,9 +1,9 @@
 import { useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 
-import { ProgressBar } from '@/components/dashboard/progress-bar';
+import { ProgressBar } from '@/components/ui/progress-bar';
 import { sampleWeightSeriesKg } from '@/components/dashboard/sample-data';
-import { Sparkline } from '@/components/dashboard/sparkline';
+import { Sparkline } from '@/components/ui/sparkline';
 import { ThemedText } from '@/components/themed-text';
 import { Card } from '@/components/ui/card';
 import { StatNumber } from '@/components/ui/stat-number';

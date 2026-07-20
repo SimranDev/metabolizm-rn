@@ -2,7 +2,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useState } from 'react';
 import { ActivityIndicator, Alert, ScrollView, StyleSheet, View } from 'react-native';
 
-import { GroupScreenHeader } from '@/components/groups/screen-header';
+import { ScreenHeader } from '@/components/ui/screen-header';
 import { ShareToggles } from '@/components/groups/share-toggles';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
@@ -85,7 +85,7 @@ export default function GroupSharingScreen() {
 
   return (
     <ThemedView style={styles.container}>
-      <GroupScreenHeader
+      <ScreenHeader
         title="Sharing"
         subtitle={
           summary ? `${summary.name} · ${CATEGORY_LABEL[summary.category]} preset` : undefined

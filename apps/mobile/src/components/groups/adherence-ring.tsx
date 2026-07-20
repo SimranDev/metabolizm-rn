@@ -16,7 +16,7 @@ type Props = {
 
 /**
  * Progress ring, drawn with two clipped hemispheres instead of SVG — the app
- * ships no chart library (see components/dashboard/sparkline.tsx for the same
+ * ships no chart library (see components/ui/sparkline.tsx for the same
  * trade-off).
  *
  * Each hemisphere clips a full circle whose top and right borders are colored.

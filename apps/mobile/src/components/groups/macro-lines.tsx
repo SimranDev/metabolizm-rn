@@ -1,6 +1,6 @@
 import { StyleSheet, View } from 'react-native';
 
-import { ProgressBar } from '@/components/dashboard/progress-bar';
+import { ProgressBar } from '@/components/ui/progress-bar';
 import { ThemedText } from '@/components/themed-text';
 import { Spacing, useTheme } from '@/theme';
 import { macroColor, macroTextColor, type MacroKind } from '@/theme/palette';

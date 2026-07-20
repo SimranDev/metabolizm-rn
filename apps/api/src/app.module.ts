@@ -11,6 +11,8 @@ import { GroupsModule } from "./groups/groups.module";
 import { HealthModule } from "./health/health.module";
 import { SummariesModule } from "./summaries/summaries.module";
 import { SyncModule } from "./sync/sync.module";
+import { UsersModule } from "./users/users.module";
+import { WeightModule } from "./weight/weight.module";
 
 @Module({
   imports: [
@@ -18,9 +20,11 @@ import { SyncModule } from "./sync/sync.module";
     DbModule,
     HealthModule,
     AuthModule,
+    UsersModule,
     CatalogModule,
     DiaryModule,
     SummariesModule,
+    WeightModule,
     GroupsModule,
     SyncModule,
     BillingModule,

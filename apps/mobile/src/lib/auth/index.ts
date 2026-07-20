@@ -16,6 +16,7 @@ import {
 } from '@react-native-google-signin/google-signin';
 import * as AppleAuthentication from 'expo-apple-authentication';
 import * as Crypto from 'expo-crypto';
+import { useEffect, useState } from 'react';
 import { Platform } from 'react-native';
 
 import { authClient, clearStoredSession } from './client';
@@ -186,4 +187,36 @@ export async function signOut(): Promise<void> {
 /** The session cookie for authenticated API requests, or null. */
 export async function getToken(): Promise<string | null> {
   return authClient.getCookie() || null;
+}
+
+// Resolved once per launch: the id doesn't change within a session, and group
+// screens need it on first paint to mark their own row "You".
+let cachedUserId: string | null = null;
+
+/**
+ * The signed-in user's id, or null while it resolves (and when signed out).
+ * Group screens use it to tell their own card, reaction, and comment apart
+ * from everyone else's.
+ */
+export function useCurrentUserId(): string | null {
+  const [userId, setUserId] = useState<string | null>(cachedUserId);
+
+  useEffect(() => {
+    if (cachedUserId !== null) return;
+    let active = true;
+    authClient
+      .getSession()
+      .then(({ data }) => {
+        cachedUserId = data?.user.id ?? null;
+        if (active) setUserId(cachedUserId);
+      })
+      .catch(() => {
+        // Signed out or offline — screens fall back to showing real names.
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  return userId;
 }

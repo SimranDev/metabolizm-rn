@@ -67,6 +67,16 @@ export default function RootLayout() {
           <Stack.Screen name="(tabs)" />
           <Stack.Screen name="add-food" options={{ presentation: 'fullScreenModal' }} />
           <Stack.Screen name="food-detail" options={{ presentation: 'fullScreenModal' }} />
+          {/* Groups drill-downs push above the tabs — they carry their own
+              header, since the persistent AppHeader belongs to the tab group.
+              Create and join are pushes, not modals: both `replace` themselves
+              with the group they just produced, which would otherwise leave
+              the group detail stuck in a modal presentation. */}
+          <Stack.Screen name="group/[id]" />
+          <Stack.Screen name="member-day" />
+          <Stack.Screen name="create-group" />
+          <Stack.Screen name="join-group" />
+          <Stack.Screen name="group-sharing" options={{ presentation: 'modal' }} />
         </Stack.Protected>
         <Stack.Protected guard={!onboardingComplete}>
           <Stack.Screen name="(onboarding)" />

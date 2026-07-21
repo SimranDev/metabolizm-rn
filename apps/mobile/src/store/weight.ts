@@ -68,9 +68,16 @@ type WeightState = PersistedWeight & {
   setUnit: (unit: WeightUnit) => void;
   setGoal: (input: {
     targetWeightKg: number;
+    /**
+     * Only needed when the account has no weigh-ins: the server otherwise
+     * snapshots the latest one, and rejects the goal outright if there is none.
+     */
+    startingWeightKg?: number;
     targetDate?: string | null;
   }) => Promise<void>;
   flushPending: () => Promise<void>;
+  /** Drop everything cached for the signed-in account. See lib/session. */
+  reset: () => void;
 };
 
 const message = (err: unknown): string =>
@@ -99,6 +106,19 @@ export const useWeight = create<WeightState>()(
       pending: [],
       status: "idle",
       error: null,
+
+      // `unit` goes back to the default too: it is a per-account preference
+      // read from the server on the next refresh, not a device setting.
+      reset: () =>
+        set({
+          entries: [],
+          goal: null,
+          unit: "kg",
+          summary: null,
+          pending: [],
+          status: "idle",
+          error: null,
+        }),
 
       refresh: async () => {
         set({ status: "loading", error: null });
@@ -205,8 +225,12 @@ export const useWeight = create<WeightState>()(
         void usersApi.updateMe({ weightUnit: unit }).catch(() => {});
       },
 
-      setGoal: async ({ targetWeightKg, targetDate = null }) => {
-        const { goal } = await weightApi.putGoal({ targetWeightKg, targetDate });
+      setGoal: async ({ targetWeightKg, startingWeightKg, targetDate = null }) => {
+        const { goal } = await weightApi.putGoal({
+          targetWeightKg,
+          targetDate,
+          ...(startingWeightKg === undefined ? null : { startingWeightKg }),
+        });
         set({ goal });
         void get().refresh();
       },

@@ -15,6 +15,13 @@ type ProfileState = {
   onboardingComplete: boolean;
   profile: Profile | null;
   completeOnboarding: (profile: Profile) => void;
+  /**
+   * Patch the stored snapshot — targets, goal weight, unit preferences.
+   * The Log tab reads `targetCalories` straight off this, so a settings change
+   * that only reached the server would leave the day's ring scored against the
+   * old number until the next sign-in.
+   */
+  updateProfile: (patch: Partial<Profile>) => void;
   reset: () => void;
 };
 
@@ -24,6 +31,8 @@ export const useProfile = create<ProfileState>()(
       onboardingComplete: false,
       profile: null,
       completeOnboarding: (profile) => set({ profile, onboardingComplete: true }),
+      updateProfile: (patch) =>
+        set((state) => (state.profile ? { profile: { ...state.profile, ...patch } } : state)),
       reset: () => set({ profile: null, onboardingComplete: false }),
     }),
     {

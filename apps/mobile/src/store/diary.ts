@@ -245,6 +245,8 @@ type DiaryState = PersistedDiary & {
   setDate: (date: string) => void;
   /** Drain the outbox, then pull the server delta. Safe to call on every focus. */
   sync: () => Promise<void>;
+  /** Drop everything cached for the signed-in account. See lib/session. */
+  reset: () => void;
 };
 
 /**
@@ -334,6 +336,19 @@ export const useDiary = create<DiaryState>()(
       },
 
       setDate: (date) => set({ currentDate: date }),
+
+      // Unsent outbox writes are discarded, not preserved: they belong to the
+      // account being signed out and could never be pushed as anyone else.
+      reset: () =>
+        set({
+          entriesByDate: {},
+          recentFoods: [],
+          outbox: [],
+          deleteOutbox: [],
+          cursor: null,
+          currentDate: todayKey(),
+          syncing: false,
+        }),
 
       sync: async () => {
         if (get().syncing) return;

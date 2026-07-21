@@ -1,0 +1,41 @@
+appId: com.anonymous.metabolizmrn
+name: Profile — targets, goal weight, and the sign-out affordance
+tags:
+  - profile
+---
+# Needs an already-onboarded account on the device.
+
+- launchApp
+- runFlow: subflows/dismiss-logbox.yaml
+
+- tapOn: "Profile"
+- assertVisible: "SIGNED IN AS"
+
+# ── daily targets ─────────────────────────────────────────────────────────
+- assertVisible: "DAILY TARGETS"
+- assertVisible: "CALORIES"
+- assertVisible: "PROTEIN (G)"
+- assertVisible: "CARBS (G)"
+- assertVisible: "FAT (G)"
+# The Save button is deliberately absent until something is edited, so a
+# permanently-disabled primary button is never the resting state.
+- assertNotVisible: "Save targets"
+
+# ── goal weight ───────────────────────────────────────────────────────────
+# This is the F6 fix: onboarding collected a goal weight and nothing ever
+# called setGoal, so `user_weight_goals` stayed empty for every user and the
+# weight screen's GOAL / TO GO chips and "Journey to goal" block never rendered.
+- assertVisible: "GOAL WEIGHT"
+- assertNotVisible: "Save goal weight"
+
+# ── sign out exists and confirms ──────────────────────────────────────────
+# F8: there was previously no way out of the account at all. Cancel rather than
+# confirm, so the flow leaves the device usable for the rest of the suite.
+- scrollUntilVisible:
+    element: "Sign out"
+    direction: DOWN
+- tapOn: "Sign out"
+- assertVisible: "Sign out?"
+- assertVisible: ".*removed from this device.*"
+- tapOn: "Cancel"
+- assertVisible: "SIGNED IN AS"

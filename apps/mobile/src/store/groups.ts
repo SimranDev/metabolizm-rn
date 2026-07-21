@@ -47,6 +47,8 @@ type GroupsState = PersistedGroups & {
   ) => Promise<GroupShareConfig>;
   /** Clears the unread badge by moving my read marker to now. */
   markSeen: (groupId: string) => void;
+  /** Drop everything cached for the signed-in account. See lib/session. */
+  reset: () => void;
 };
 
 const message = (err: unknown): string =>
@@ -58,6 +60,8 @@ export const useGroups = create<GroupsState>()(
       groups: [],
       status: "idle",
       error: null,
+
+      reset: () => set({ groups: [], status: "idle", error: null }),
 
       refresh: async () => {
         set({ status: "loading", error: null });

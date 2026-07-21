@@ -1,11 +1,33 @@
-import { users } from "@metabolizm/db";
-import type { MeDto, UpdateMeInput } from "@metabolizm/shared";
+import { dailySummaries, userTargets, users } from "@metabolizm/db";
+import type {
+  MeDto,
+  PutMyTargetsInput,
+  UpdateMeInput,
+  UserTargetDto,
+} from "@metabolizm/shared";
 import { Inject, Injectable, NotFoundException } from "@nestjs/common";
-import { eq } from "drizzle-orm";
+import { and, eq, gte } from "drizzle-orm";
+import { uuidv7 } from "uuidv7";
 
 import { DB, type Database } from "../db/db.module";
+import { SummariesService } from "../summaries/summaries.service";
 
 type UserRow = typeof users.$inferSelect;
+type TargetRow = typeof userTargets.$inferSelect;
+
+function toTargetDto(row: TargetRow): UserTargetDto {
+  return {
+    id: row.id,
+    userId: row.userId,
+    effectiveFrom: row.effectiveFrom,
+    energyKcal: row.energyKcal,
+    proteinG: row.proteinG,
+    carbsG: row.carbsG,
+    fatG: row.fatG,
+    setBy: row.setBy,
+    createdAt: row.createdAt.toISOString(),
+  };
+}
 
 function toMeDto(row: UserRow): MeDto {
   return {
@@ -26,7 +48,10 @@ function toMeDto(row: UserRow): MeDto {
  */
 @Injectable()
 export class UsersService {
-  constructor(@Inject(DB) private readonly db: Database) {}
+  constructor(
+    @Inject(DB) private readonly db: Database,
+    private readonly summaries: SummariesService,
+  ) {}
 
   async me(userId: string): Promise<MeDto> {
     const [row] = await this.db
@@ -55,5 +80,57 @@ export class UsersService {
       .returning();
     if (!row) throw new NotFoundException("User not found");
     return toMeDto(row);
+  }
+
+  /**
+   * Set the caller's own calorie/macro targets.
+   *
+   * Without a row here every `daily_summaries` day snapshots NULL targets and
+   * is therefore unscorable, which makes group adherence and leaderboards
+   * permanently empty however much the user logs. Onboarding computes these
+   * numbers, so this is what carries them from the device to the account.
+   *
+   * Append-only, exactly like the coach path (groups.service `putMemberTargets`)
+   * — a new row per change rather than an update, so each day keeps the target
+   * that was in force when it was scored. Only days on or after
+   * `effectiveFrom` are re-snapshotted; earlier ones keep their own history.
+   */
+  async putMyTargets(
+    userId: string,
+    input: PutMyTargetsInput,
+  ): Promise<UserTargetDto> {
+    return await this.db.transaction(async (tx) => {
+      const [target] = await tx
+        .insert(userTargets)
+        .values({
+          id: uuidv7(),
+          userId,
+          effectiveFrom: input.effectiveFrom,
+          energyKcal: input.energyKcal,
+          proteinG: input.proteinG,
+          carbsG: input.carbsG,
+          fatG: input.fatG,
+          // Self-set, as opposed to a coach's id on the groups path.
+          setBy: userId,
+        })
+        .returning();
+
+      const affected = await tx
+        .select({ entryDate: dailySummaries.entryDate })
+        .from(dailySummaries)
+        .where(
+          and(
+            eq(dailySummaries.userId, userId),
+            gte(dailySummaries.entryDate, input.effectiveFrom),
+          ),
+        );
+      await this.summaries.recomputeDays(
+        tx,
+        userId,
+        affected.map((r) => r.entryDate),
+      );
+
+      return toTargetDto(target);
+    });
   }
 }

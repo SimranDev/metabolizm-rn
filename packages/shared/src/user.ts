@@ -4,6 +4,7 @@
  * what every "today" on the backend is computed against.
  */
 
+import type { UserTargetDto } from "./groups";
 import type { WeightUnit } from "./health";
 
 export type MeDto = {
@@ -17,3 +18,10 @@ export type MeDto = {
 };
 
 export type MeResponse = { user: MeDto };
+
+/**
+ * The caller's own targets. Same row shape the coach path returns — a user
+ * setting their own and a coach setting a client's write the same
+ * `user_targets` table, so they deliberately share `UserTargetDto`.
+ */
+export type MyTargetsResponse = { target: UserTargetDto };

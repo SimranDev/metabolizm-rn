@@ -11,6 +11,7 @@ import { usersApi } from '@/lib/api';
 import { signUp, type AuthUser } from '@/lib/auth';
 import { haptics } from '@/lib/haptics';
 import { buildMetrics, resolveSelectedPlan } from '@/lib/onboarding-metrics';
+import { todayKey } from '@/store/diary';
 import { useOnboarding } from '@/store/onboarding';
 import { useProfile } from '@/store/profile';
 import type { Profile } from '@metabolizm/shared';
@@ -63,6 +64,20 @@ export default function SignUpScreen() {
     // Without it the account keeps the server's UTC default until the next
     // launch, and day one's entries are filed against the wrong local date.
     usersApi.pushDeviceTimezone();
+    // Carry the plan the user just chose to the account. `daily_summaries`
+    // snapshots the target in force for each day, so without this row every
+    // day is unscorable and group adherence stays empty however much they log.
+    // Fire-and-forget for the same reason as the timezone push — a failure
+    // must not block entry into the app.
+    void usersApi
+      .putMyTargets({
+        effectiveFrom: todayKey(),
+        energyKcal: plan.targetCalories,
+        proteinG: plan.macros.proteinG,
+        carbsG: plan.macros.carbsG,
+        fatG: plan.macros.fatG,
+      })
+      .catch(() => {});
     completeOnboarding(profile);
     answers.reset();
   };

@@ -7,7 +7,12 @@
  * pushes its zone has all of those silently shifted by its real offset.
  */
 
-import type { MeResponse, WeightUnit } from "@metabolizm/shared";
+import type {
+  MeResponse,
+  MyTargetsResponse,
+  PutMyTargetsInput,
+  WeightUnit,
+} from "@metabolizm/shared";
 
 import { apiRequest } from "./client";
 
@@ -22,6 +27,21 @@ export function updateMe(
   opts?: Signal,
 ): Promise<MeResponse> {
   return apiRequest("/users/me", { method: "PATCH", body: patch, ...opts });
+}
+
+/**
+ * Write the caller's calorie/macro targets.
+ *
+ * Append-only server-side: each call records a new row effective from the given
+ * day, and `daily_summaries` snapshots whichever row was in force when a day
+ * was scored. Without at least one of these every day is unscorable, so group
+ * adherence and leaderboards stay empty no matter how much the user logs.
+ */
+export function putMyTargets(
+  input: PutMyTargetsInput,
+  opts?: Signal,
+): Promise<MyTargetsResponse> {
+  return apiRequest("/users/me/targets", { method: "PUT", body: input, ...opts });
 }
 
 /** The device's IANA zone, e.g. "America/Los_Angeles". */

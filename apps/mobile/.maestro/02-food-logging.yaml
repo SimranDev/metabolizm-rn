@@ -1,0 +1,59 @@
+appId: com.anonymous.metabolizmrn
+name: Food logging — search the catalog, log a meal, verify totals
+tags:
+  - diary
+---
+# Requires an account already onboarded on the device (onboarding cannot
+# currently complete on its own — see F0). Run 01-onboarding first once the
+# route collision is fixed, or sign in on a device that has a local profile.
+
+- launchApp
+- runFlow: subflows/dismiss-logbox.yaml
+
+- assertVisible: "CALORIES"
+- tapOn: "Add food to breakfast"
+
+# ── search ────────────────────────────────────────────────────────────────
+- assertVisible: "Search for a food"
+- tapOn: "Search for a food"
+- inputText: "chicken"
+- assertVisible: "RESULTS"
+- assertVisible: "Chicken, ground, raw"
+
+# ── detail: portion maths ─────────────────────────────────────────────────
+- tapOn: "Chicken, ground, raw details"
+- assertVisible: "Nutrition Facts"
+# 113 g of a 143 kcal/100 g food
+- assertVisible: "162"
+- assertVisible: "19.7g"        # protein
+- assertVisible: "9.2g"         # total fat
+
+# The quantity field cannot be driven reliably: it has no testID and no a11y
+# label (T1), so it is only reachable by a positional tap, and `eraseText`
+# against it hangs. Verified manually instead — quantity 2 shows 323 kcal and
+# 18.3 g fat, i.e. recomputed from the 226 g base rather than doubling the
+# rounded 162. Add a testID to assert that here.
+- tapOn: "Save"
+
+# ── commit to the diary ───────────────────────────────────────────────────
+- assertVisible: "Remove Chicken, ground, raw"
+- tapOn: "Add to Breakfast"
+
+# ── the day's totals ──────────────────────────────────────────────────────
+# Totals accumulate across runs, so assert the entry landed and the day is
+# scored rather than a fixed number. The exact-value regression check lives on
+# the detail screen above, which is state-independent.
+- assertVisible: "CALORIES"
+- assertVisible: "Chicken, ground, raw"
+- assertVisible: ".*cal"
+
+# This flow only proves the UI. The half it cannot see is the sync, so after a
+# run also check the server actually received it — a green flow with an empty
+# `diary_entries` is exactly the failure this suite is blind to:
+#
+#   docker exec metabolizm-rn-postgres-1 psql -U metabolizm -d metabolizm -c \
+#     "select entry_date, meal, name, energy_kcal from diary_entries
+#      order by created_at desc limit 5;"
+#
+# and that the day is scoreable (target_kcal NOT NULL in daily_summaries),
+# which is what makes group adherence non-null.

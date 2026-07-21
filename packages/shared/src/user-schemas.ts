@@ -7,6 +7,7 @@
 
 import { z } from "zod";
 
+import { entryDateSchema } from "./diary-schemas";
 import { weightUnitSchema } from "./weight-schemas";
 
 /**
@@ -40,3 +41,22 @@ export const updateMeSchema = z
   });
 
 export type UpdateMeInput = z.output<typeof updateMeSchema>;
+
+/**
+ * The caller's own calorie/macro targets.
+ *
+ * Bounds match putMemberTargetsSchema — a coach setting a client's targets and
+ * a user setting their own write the same `user_targets` row, and must agree on
+ * what is acceptable. `effectiveFrom` is a local `YYYY-MM-DD`: days before it
+ * keep whatever they already snapshotted, which is what stops a mid-week change
+ * from rewriting past adherence.
+ */
+export const putMyTargetsSchema = z.object({
+  effectiveFrom: entryDateSchema,
+  energyKcal: z.number().min(0).max(99_999),
+  proteinG: z.number().min(0).max(9_999),
+  carbsG: z.number().min(0).max(9_999),
+  fatG: z.number().min(0).max(9_999),
+});
+
+export type PutMyTargetsInput = z.output<typeof putMyTargetsSchema>;

@@ -32,6 +32,17 @@ export function updateMe(
 }
 
 /**
+ * Delete the account and every record on it, server-side. Irreversible.
+ *
+ * Not called directly from the UI — go through `lib/session`'s `deleteAccount`,
+ * which is what also tears down the on-device caches. Resolves on 204; throws
+ * (and changes nothing) on any failure.
+ */
+export function deleteMe(opts?: Signal): Promise<void> {
+  return apiRequest("/users/me", { method: "DELETE", ...opts });
+}
+
+/**
  * Write the caller's calorie/macro targets.
  *
  * Append-only server-side: each call records a new row effective from the given

@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Alert, ScrollView, StyleSheet, View } from 'react-native';
 
 import { AppearanceCard } from '@/components/profile/appearance-card';
+import { DeleteAccountSheet } from '@/components/profile/delete-account-sheet';
 import { GoalWeightCard } from '@/components/profile/goal-weight-card';
 import { TargetsCard } from '@/components/profile/targets-card';
 import { ThemedText } from '@/components/themed-text';
@@ -30,6 +31,7 @@ export default function ProfileScreen() {
   const profile = useProfile((s) => s.profile);
   const unit = useWeight((s) => s.unit);
   const [signingOut, setSigningOut] = useState(false);
+  const [deleteOpen, setDeleteOpen] = useState(false);
 
   const confirmSignOut = () => {
     Alert.alert(
@@ -82,9 +84,21 @@ export default function ProfileScreen() {
               disabled={signingOut}
               fullWidth
             />
+            {/* Ghost, not a red button: the weight belongs on the confirmation
+                step, where the consequences are actually spelled out. A
+                destructive-looking control here is just a thing to mis-tap. */}
+            <Button
+              label="Delete account"
+              variant="ghost"
+              onPress={() => setDeleteOpen(true)}
+              disabled={signingOut}
+              fullWidth
+            />
           </View>
         </ScrollView>
       )}
+
+      <DeleteAccountSheet visible={deleteOpen} onClose={() => setDeleteOpen(false)} />
     </ThemedView>
   );
 }
@@ -98,5 +112,5 @@ const styles = StyleSheet.create({
   },
   account: { gap: Spacing.s4 },
   section: { gap: Spacing.s12 },
-  danger: { marginTop: Spacing.s8 },
+  danger: { marginTop: Spacing.s8, gap: Spacing.s4 },
 });

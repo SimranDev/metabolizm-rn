@@ -3,7 +3,15 @@ import type {
   MyProfileResponse,
   MyTargetsResponse,
 } from "@metabolizm/shared";
-import { Body, Controller, Get, Patch, Put } from "@nestjs/common";
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  HttpCode,
+  Patch,
+  Put,
+} from "@nestjs/common";
 
 import { CallerContext } from "../common/caller-context";
 import { ZodValidationPipe } from "../common/zod-validation.pipe";
@@ -36,6 +44,18 @@ export class UsersController {
     return {
       user: await this.usersService.update(this.caller.requireUserId(), body),
     };
+  }
+
+  /**
+   * Delete the account and every record belonging to it. Irreversible, and
+   * takes the caller's session with it — the client must tear down its local
+   * caches once this returns. Bodyless: the confirmation is the client's job,
+   * a typed-name payload here would only be a second thing to get wrong.
+   */
+  @Delete("me")
+  @HttpCode(204)
+  async deleteMe(): Promise<void> {
+    await this.usersService.deleteAccount(this.caller.requireUserId());
   }
 
   @Put("me/targets")

@@ -35,7 +35,7 @@ import {
   Injectable,
   NotFoundException,
 } from "@nestjs/common";
-import { and, count, eq, gte, isNull, sql } from "drizzle-orm";
+import { and, count, eq, gte, isNull, ne, sql } from "drizzle-orm";
 import { uuidv7 } from "uuidv7";
 
 import { isPgError } from "../common/pg-error";
@@ -92,6 +92,33 @@ export function isCoach(group: GroupRow, membership: MemberRow): boolean {
     group.category === "trainer" &&
     (membership.role === "coach" || membership.role === "owner")
   );
+}
+
+/** Seniority order for the heir picked when an owner deletes their account. */
+const HEIR_RANK: Record<MemberRow["role"], number> = {
+  owner: 0,
+  admin: 1,
+  coach: 2,
+  member: 3,
+};
+
+/**
+ * Who inherits a group whose owner is deleting their account: the most senior
+ * active member, oldest membership breaking the tie. Null when nobody is left.
+ */
+function pickHeir(candidates: MemberRow[]): MemberRow | null {
+  let heir: MemberRow | null = null;
+  for (const candidate of candidates) {
+    if (
+      heir === null ||
+      HEIR_RANK[candidate.role] < HEIR_RANK[heir.role] ||
+      (HEIR_RANK[candidate.role] === HEIR_RANK[heir.role] &&
+        candidate.joinedAt < heir.joinedAt)
+    ) {
+      heir = candidate;
+    }
+  }
+  return heir;
 }
 
 @Injectable()
@@ -269,6 +296,60 @@ export class GroupsService {
       return g;
     });
     return { group: toGroupDto(updated) };
+  }
+
+  /**
+   * Hand off or tear down every group this user owns, so their account row can
+   * be deleted. Called by `UsersService.deleteAccount` inside its transaction —
+   * `groups.owner_id` is ON DELETE RESTRICT precisely so that a departing owner
+   * can never silently orphan a group other people are still using.
+   *
+   * A group with other active members is transferred to the most senior of them
+   * rather than deleted: the leaver's data disappears with their account, but
+   * everyone else keeps the group, their own history, and each other. Only a
+   * group nobody else is left in is destroyed — hard, not soft, because a
+   * soft-deleted row still holds the FK that blocks the account delete.
+   */
+  async releaseOwnedGroups(tx: DbExecutor, userId: string): Promise<void> {
+    const owned = await tx
+      .select()
+      .from(groups)
+      .where(eq(groups.ownerId, userId));
+
+    for (const group of owned) {
+      // Already soft-deleted by its owner: nothing to hand over.
+      const heir = group.deletedAt
+        ? null
+        : pickHeir(
+            await tx
+              .select()
+              .from(groupMembers)
+              .where(
+                and(
+                  eq(groupMembers.groupId, group.id),
+                  eq(groupMembers.status, "active"),
+                  ne(groupMembers.userId, userId),
+                ),
+              ),
+          );
+
+      if (!heir) {
+        // Cascades to members, invites and interactions.
+        await tx.delete(groups).where(eq(groups.id, group.id));
+        continue;
+      }
+
+      await tx
+        .update(groups)
+        .set({ ownerId: heir.userId, updatedAt: new Date() })
+        .where(eq(groups.id, group.id));
+      await tx
+        .update(groupMembers)
+        .set({ role: "owner" })
+        .where(eq(groupMembers.id, heir.id));
+      // The leaver's own membership row goes with their user row (cascade), so
+      // there is no outgoing-owner demotion to do here.
+    }
   }
 
   async createInvite(

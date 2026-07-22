@@ -11,6 +11,7 @@
  * `lib/auth` directly clears the session but leaves all of that behind.
  */
 
+import { usersApi } from "@/lib/api";
 import { signOut } from "@/lib/auth";
 import { useDiary } from "@/store/diary";
 import { useGroups } from "@/store/groups";
@@ -19,7 +20,13 @@ import { useProfile } from "@/store/profile";
 import { useSummaries } from "@/store/summaries";
 import { useWeight } from "@/store/weight";
 
-/** Wipe every account-scoped store. Exported for tests and account switching. */
+/**
+ * Wipe every account-scoped store. Exported for tests and account switching.
+ *
+ * Account-scoped is the operative word: device preferences (the theme choice in
+ * `theme/preference.ts`) are deliberately NOT reset here. They belong to the
+ * phone, not the account, and survive both signing out and deleting.
+ */
 export function clearLocalData(): void {
   useDiary.getState().reset();
   useSummaries.getState().reset();
@@ -45,4 +52,23 @@ export async function endSession(): Promise<void> {
   } finally {
     clearLocalData();
   }
+}
+
+/**
+ * Delete the account server-side, then tear this device down.
+ *
+ * The opposite order of guarantees from `endSession`, and deliberately so. Sign
+ * out is best-effort: an offline user must still get out, so the local wipe runs
+ * even when the server call fails. Deletion is the reverse — the server is the
+ * only place the account actually exists, so nothing is wiped until it confirms
+ * the row is gone. A failed call therefore leaves the user signed in with all
+ * their data, seeing an error, rather than locally erased but still an account.
+ *
+ * After the delete lands the session is already dead server-side (the Better
+ * Auth `sessions` rows cascade with the user), so `signOut` here is only about
+ * dropping the cached cookie — hence best-effort, inside `endSession`.
+ */
+export async function deleteAccount(): Promise<void> {
+  await usersApi.deleteMe();
+  await endSession();
 }

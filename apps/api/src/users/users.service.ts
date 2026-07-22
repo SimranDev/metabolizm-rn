@@ -12,6 +12,7 @@ import { and, eq, gte } from "drizzle-orm";
 import { uuidv7 } from "uuidv7";
 
 import { DB, type Database } from "../db/db.module";
+import { GroupsService } from "../groups/groups.service";
 import { SummariesService } from "../summaries/summaries.service";
 
 type UserRow = typeof users.$inferSelect;
@@ -70,6 +71,8 @@ export class UsersService {
   constructor(
     @Inject(DB) private readonly db: Database,
     private readonly summaries: SummariesService,
+    // Only for the owned-group handoff in deleteAccount — see below.
+    private readonly groups: GroupsService,
   ) {}
 
   async me(userId: string): Promise<MeDto> {
@@ -194,5 +197,37 @@ export class UsersService {
       })
       .returning();
     return toProfileDto(row);
+  }
+
+  /**
+   * Delete the account and everything belonging to it. Irreversible — there is
+   * no soft-delete flag and no restore path.
+   *
+   * One `DELETE FROM users` does almost all of the work: every table that
+   * references `users.id` is ON DELETE CASCADE, so the diary, weight history,
+   * daily summaries, targets, onboarding profile, custom foods, group
+   * memberships and invites all go with the row — as do the Better Auth
+   * `sessions` and `accounts` rows, which is what makes the caller's own
+   * session (and any other device's) dead the moment this commits.
+   *
+   * The single exception is `groups.owner_id`, which is ON DELETE RESTRICT so
+   * that owned groups have to be dealt with explicitly rather than orphaned;
+   * `releaseOwnedGroups` transfers or destroys them first, in this same
+   * transaction, so a failure part-way leaves the account fully intact.
+   *
+   * What deliberately survives: rows that are somebody else's record, not this
+   * user's. `diary_entries.food_id` and `user_targets.set_by` are ON DELETE SET
+   * NULL, so another member's logged history keeps its denormalized snapshot
+   * and a coach-set target keeps its effect after the setter leaves.
+   */
+  async deleteAccount(userId: string): Promise<void> {
+    await this.db.transaction(async (tx) => {
+      await this.groups.releaseOwnedGroups(tx, userId);
+      const deleted = await tx
+        .delete(users)
+        .where(eq(users.id, userId))
+        .returning({ id: users.id });
+      if (deleted.length === 0) throw new NotFoundException("User not found");
+    });
   }
 }

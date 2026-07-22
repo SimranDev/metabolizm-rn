@@ -7,6 +7,7 @@ import { createContext, useContext, type ReactNode } from 'react';
 
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { dark, light, type ThemeColors } from '@/theme/palette';
+import { useThemePreference } from '@/theme/preference';
 
 type Scheme = 'light' | 'dark';
 
@@ -54,8 +55,13 @@ const ThemeContext = createContext<Theme>(THEMES.light);
 
 export function ThemeProvider({ children }: { children: ReactNode }) {
   const raw = useColorScheme();
+  const preference = useThemePreference((s) => s.preference);
   // Light is the default: null/undefined/'unspecified' all resolve to light.
-  const scheme: Scheme = raw === 'dark' ? 'dark' : 'light';
+  // An explicit preference overrides the OS; 'system' defers to it, so the
+  // stored value is the choice itself and never a resolved snapshot of it —
+  // otherwise "System" would freeze at whatever the OS was when it was picked.
+  const scheme: Scheme =
+    preference === 'system' ? (raw === 'dark' ? 'dark' : 'light') : preference;
   return (
     <ThemeContext.Provider value={THEMES[scheme]}>
       <NavThemeProvider value={NAV_THEMES[scheme]}>{children}</NavThemeProvider>

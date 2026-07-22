@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Alert, ScrollView, StyleSheet, View } from 'react-native';
 
+import { AppearanceCard } from '@/components/profile/appearance-card';
 import { GoalWeightCard } from '@/components/profile/goal-weight-card';
 import { TargetsCard } from '@/components/profile/targets-card';
 import { ThemedText } from '@/components/themed-text';
@@ -70,6 +71,8 @@ export default function ProfileScreen() {
           {/* The unit toggle lives inside this card's WeightField and is the
               app-wide preference, so there is no separate units row. */}
           <GoalWeightCard profile={profile} unit={unit} />
+
+          <AppearanceCard />
 
           <View style={styles.danger}>
             <Button

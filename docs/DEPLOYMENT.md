@@ -67,15 +67,21 @@ and *guards* both `dist/main.js` and the presence of the migrations inside
    | --- | --- |
    | `DATABASE_URL` | `${{Postgres.DATABASE_URL}}` — a Railway reference; resolves to the private-network URL |
    | `BETTER_AUTH_SECRET` | `openssl rand -base64 32` (schema enforces ≥32 chars) |
-   | `BETTER_AUTH_URL` | `https://<service>.up.railway.app` — **origin only, no path** |
+   | `BETTER_AUTH_URL` | `https://${{RAILWAY_PUBLIC_DOMAIN}}` — **keep the literal `https://`; origin only, no path** |
    | `GOOGLE_CLIENT_ID` | The **web** OAuth client id (same value as the app's `EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID`) |
    | `GOOGLE_CLIENT_SECRET` | The web client secret — the one genuine secret here |
 
-   - `BETTER_AUTH_URL` takes no `/v1/auth` suffix:
+   - `BETTER_AUTH_URL` must carry an explicit **scheme**. Railway's
+     `${{RAILWAY_PUBLIC_DOMAIN}}` expands to a *bare hostname*
+     (`foo.up.railway.app`), which `z.url()` rejects — the container then
+     crash-loops on boot with `Invalid URL / at BETTER_AUTH_URL`. Write
+     `https://${{RAILWAY_PUBLIC_DOMAIN}}`.
+   - It takes no `/v1/auth` suffix:
      [`auth.instance.ts`](../apps/api/src/auth/auth.instance.ts) supplies
      `basePath: "/v1/auth"` itself, and the mobile client appends the same path
      to `BASE_URL`. Doubling it produces `/v1/auth/v1/auth/*` and every auth
-     call 404s.
+     call 404s. Note this mistake **passes** env validation — the guard only
+     checks that the value parses as a URL.
    - **Do not set `NODE_ENV`** — the Dockerfile's runtime stage already pins it
      to `production`, which is what disables the `x-user-id` dev fallback in
      [`caller-context.ts`](../apps/api/src/common/caller-context.ts) and drops
@@ -281,6 +287,7 @@ Listed so a failure is diagnosable — no action expected:
 | Symptom | Cause |
 | --- | --- |
 | Railway build: *"flag `--mount=type=cache,id=…` is missing the cacheKey prefix from its id"* | A BuildKit cache mount was added to the Dockerfile — remove it (see §1) |
+| Container crash-loops on boot: *"Environment validation failed: Invalid URL, at BETTER_AUTH_URL"* | The value has no scheme — `${{RAILWAY_PUBLIC_DOMAIN}}` alone is a bare hostname. Use `https://${{RAILWAY_PUBLIC_DOMAIN}}` |
 | "Couldn't reach Metabolizm. Check your connection." | `EXPO_PUBLIC_API_URL` unset or `http://` at build time, or the Railway service is down |
 | "Google sign-in is not configured for this build." | `EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID` missing from the profile's `env` |
 | `DEVELOPER_ERROR` from the native SDK | §3 not done, or the SHA-1 doesn't match this build's keystore |

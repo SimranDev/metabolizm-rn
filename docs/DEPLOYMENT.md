@@ -108,6 +108,22 @@ and *guards* both `dist/main.js` and the presence of the migrations inside
    # {"status":"ok","version":"…","timestamp":"…"}
    ```
 
+   > **A green healthcheck does not mean the database works.**
+   > [`HealthController`](../apps/api/src/health/health.controller.ts) returns a
+   > static object and touches no table, and postgres-js connects lazily — so
+   > the service boots, passes its healthcheck and serves `/v1/health` happily
+   > with an unreachable or unmigrated database. The first request that proves
+   > the data path is a real query:
+   >
+   > ```bash
+   > curl 'https://<service>.up.railway.app/v1/catalog/foods?q=oats'
+   > ```
+   >
+   > A `500` there means the database — either migrations never ran (no
+   > pre-deploy command, step 5) or `DATABASE_URL` is wrong. The deploy logs
+   > carry the distinguishing postgres error: `relation "foods" does not exist`
+   > for the former, a connection/auth failure for the latter.
+
 ### Trusting the proxy
 
 [`main.ts`](../apps/api/src/main.ts) constructs the adapter with

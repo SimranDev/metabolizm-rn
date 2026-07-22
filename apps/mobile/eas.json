@@ -11,14 +11,14 @@
         "buildType": "apk"
       },
       "env": {
-        "EXPO_PUBLIC_API_URL": "https://REPLACE_WITH_RAILWAY_DOMAIN.up.railway.app",
+        "EXPO_PUBLIC_API_URL": "https://metabolizm-production.up.railway.app",
         "EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID": "662391477879-otlbn05fu98sov77rp2jsm7e8l6sem2s.apps.googleusercontent.com"
       }
     },
     "production": {
       "autoIncrement": true,
       "env": {
-        "EXPO_PUBLIC_API_URL": "https://REPLACE_WITH_RAILWAY_DOMAIN.up.railway.app",
+        "EXPO_PUBLIC_API_URL": "https://metabolizm-production.up.railway.app",
         "EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID": "662391477879-otlbn05fu98sov77rp2jsm7e8l6sem2s.apps.googleusercontent.com"
       }
     }

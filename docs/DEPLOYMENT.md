@@ -195,15 +195,28 @@ seeding, then put its `.env` back.
 
 ## 3. Google sign-in for the EAS keystore
 
-This is **blocking for sign-in** and can only be done *after* the first EAS
-build, because the keystore doesn't exist until then.
+This is **blocking for sign-in**. It can be done as soon as the keystore exists
+— EAS creates it during the *credentials* step of the first build (`✔ Created
+keystore`), so you don't have to wait for the build to finish, only to start.
 
-1. Run the first build (§4). EAS generates a release keystore automatically.
-2. Read its fingerprint:
+1. Start the first build (§4). EAS generates a release keystore automatically;
+   `--non-interactive` does not block on it.
+2. Read its SHA-1, either from
+   `https://expo.dev/accounts/<account>/projects/metabolizm/credentials`, or:
 
    ```bash
    npx eas-cli@latest credentials -p android
    ```
+
+   This command is an interactive TUI only — it has **no** `--non-interactive`
+   flag, so it cannot be scripted or run by an agent.
+
+   > **Do not use the `fingerprint` field from `eas build:view`.** That is
+   > Expo's *runtime* fingerprint (a 40-char hex hash used to decide which
+   > builds an OTA update is compatible with) and has nothing to do with code
+   > signing. It looks plausible in the Google Cloud form and will fail at
+   > sign-in. The value you want is 20 colon-separated hex pairs, like the debug
+   > key's `5E:8F:16:06:…:F6:25`.
 
 3. Google Cloud console → APIs & Services → Credentials → **Create OAuth client
    ID → Android**. Package name `com.metabolizm.app`, SHA-1 = that fingerprint.
@@ -239,9 +252,24 @@ with the real Railway domain.
 
 ```bash
 cd apps/mobile
-npx eas-cli@latest init                                # writes extra.eas.projectId into app.json
+npx eas-cli@latest login
+npx eas-cli@latest init --force        # creates + links the project, writes extra.eas.projectId
+git add app.json && git commit -m "chore: link the EAS project"
 npx eas-cli@latest build -p android --profile preview
 ```
+
+- `--force` is needed on the **first** run only. Without it,
+  `init --non-interactive` refuses with *"Project does not exist … Use --force
+  flag to create this project"* — a guard so a typo'd slug can't silently create
+  a second project.
+- **Commit the `app.json` that `init` writes** before building: EAS archives the
+  git tree, and `eas build` refuses a dirty working tree regardless.
+- `eas build --non-interactive` generates the Android keystore on its own — it
+  does not stall waiting for confirmation.
+- If `npx` dies with `EACCES`/`EEXIST` under `~/.npm/_cacache`, the npm cache has
+  root-owned directories left by a past `sudo npm` run. Fix with
+  `sudo chown -R "$(whoami)":staff ~/.npm`, or sidestep it for a single command
+  with `npm_config_cache=/tmp/npm-cache npx …`.
 
 ### Monorepo notes
 
@@ -282,18 +310,33 @@ Listed so a failure is diagnosable — no action expected:
    ([`lib/api/users.ts`](../apps/mobile/src/lib/api/users.ts) →
    `pushDeviceTimezone`).
 
-   ```sql
-   select email, timezone from users;   -- your real IANA zone, not UTC
+   Queries run through the compose container (no Postgres client on the host);
+   `$PROD` is the Postgres service's **`DATABASE_PUBLIC_URL`** from Railway →
+   Postgres → Variables:
+
+   ```bash
+   PROD='postgresql://postgres:...@...proxy.rlwy.net:PORT/railway'
+
+   docker exec -i metabolizm-rn-postgres-1 psql "$PROD" -c \
+     "select email, timezone from users;"     # your real IANA zone, NOT 'UTC'
    ```
 
 5. Log a food, add a weigh-in, open the calendar sheet — then:
 
-   ```sql
-   select provider_id from accounts where provider_id = 'google';
-   select count(*) from diary_entries;
-   select local_date, energy_kcal, weight_kg
-     from daily_summaries order by local_date desc limit 5;
+   ```bash
+   docker exec -i metabolizm-rn-postgres-1 psql "$PROD" -c "
+     select (select count(*) from accounts where provider_id='google') as google_accounts,
+            (select count(*) from diary_entries) as entries,
+            (select count(*) from weight_entries) as weights;"
+
+   docker exec -i metabolizm-rn-postgres-1 psql "$PROD" -c "
+     select local_date, energy_kcal, protein_g, weight_kg
+       from daily_summaries order by local_date desc limit 5;"
    ```
+
+   `daily_summaries` is the real proof: it is recomputed inside the same
+   transaction as each diary write, so a row appearing there means the whole
+   write path — auth, entry insert, rollup, target snapshot — worked.
 
 6. Put the phone in airplane mode and reopen. The MMKV-first stores must still
    paint the Log tab and the week strip with zero requests.

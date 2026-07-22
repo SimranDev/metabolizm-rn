@@ -16,11 +16,13 @@ import { useDiary } from "@/store/diary";
 import { useGroups } from "@/store/groups";
 import { useOnboarding } from "@/store/onboarding";
 import { useProfile } from "@/store/profile";
+import { useSummaries } from "@/store/summaries";
 import { useWeight } from "@/store/weight";
 
 /** Wipe every account-scoped store. Exported for tests and account switching. */
 export function clearLocalData(): void {
   useDiary.getState().reset();
+  useSummaries.getState().reset();
   useWeight.getState().reset();
   useGroups.getState().reset();
   useOnboarding.getState().reset();

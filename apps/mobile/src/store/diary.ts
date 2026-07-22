@@ -18,12 +18,15 @@
  * locally. A pruned "recently logged" list backs the add-food recents fallback.
  */
 
+import { AppState } from "react-native";
 import { uuidv7 } from "uuidv7";
 import { create } from "zustand";
 import { createJSONStorage, persist } from "zustand/middleware";
 
 import { ApiError, diaryApi } from "@/lib/api";
+import { addDays, dayKey } from "@/lib/dates";
 import { fromDto, toUpsert } from "@/lib/diary";
+import { DIARY_MAX_FUTURE_DAYS } from "@metabolizm/shared";
 import type {
   DiaryEntry,
   DiaryEntryDto,
@@ -54,25 +57,58 @@ const emptyEntries = (): EntriesByMeal => ({
   snack: [],
 });
 
-/** How many recent days to keep on-device; older days live on the backend. */
-const MAX_LOCAL_DAYS = 7;
+/**
+ * How much history stays on-device, as a window ANCHORED ON TODAY rather than
+ * a count of the most recent days.
+ *
+ * The anchor is the whole point: keeping "the N latest keys" worked only while
+ * every key was in the past. Once a day can be planned three weeks ahead, the
+ * future days are the chronologically largest and a plain `slice(-N)` evicts
+ * today and all history along with it.
+ *
+ * 90 days is deliberately generous — MMKV is mmap'd and synchronous, and this
+ * is a few hundred KB — because it is what makes the day switcher scroll back
+ * through a season instantly and offline, with no request at all.
+ */
+const RETAIN_PAST_DAYS = 90;
+/** One past the plannable horizon, so every day the UI offers stays local. */
+const RETAIN_FUTURE_DAYS = DIARY_MAX_FUTURE_DAYS + 1;
 /** Cap on the "recently logged" list backing the add-food fallback. */
 const MAX_RECENTS = 20;
 
-/** Local `YYYY-MM-DD` for a date — the key into `entriesByDate`. */
-export function todayKey(date = new Date()): string {
-  const y = date.getFullYear();
-  const m = String(date.getMonth() + 1).padStart(2, "0");
-  const d = String(date.getDate()).padStart(2, "0");
-  return `${y}-${m}-${d}`;
+/**
+ * Local `YYYY-MM-DD` for a date — the key into `entriesByDate`.
+ *
+ * Re-exported from lib/dates, which is now the single implementation of this;
+ * the name stays because entries, widgets and onboarding all import it here.
+ */
+export const todayKey = dayKey;
+
+/** Inclusive bounds of the retained window around today. */
+function retentionWindow(): { from: string; to: string } {
+  const today = dayKey();
+  return {
+    from: addDays(today, -RETAIN_PAST_DAYS),
+    to: addDays(today, RETAIN_FUTURE_DAYS),
+  };
 }
 
-/** Drop all but the most recent `MAX_LOCAL_DAYS` days (ISO keys sort chronologically). */
-function pruneDays(byDate: Record<string, EntriesByMeal>): Record<string, EntriesByMeal> {
-  const keys = Object.keys(byDate);
-  if (keys.length <= MAX_LOCAL_DAYS) return byDate;
-  const keep = keys.sort().slice(-MAX_LOCAL_DAYS);
-  return Object.fromEntries(keep.map((k) => [k, byDate[k]]));
+/**
+ * Drop days outside the retained window, always keeping `pinned` (the day being
+ * viewed). Without the pin, browsing to an old month would fetch that day and
+ * then immediately evict it on the next sync, blanking the screen underneath
+ * the user.
+ */
+function pruneDays(
+  byDate: Record<string, EntriesByMeal>,
+  pinned?: string,
+): Record<string, EntriesByMeal> {
+  const { from, to } = retentionWindow();
+  const kept = Object.entries(byDate).filter(
+    ([date]) => (date >= from && date <= to) || date === pinned,
+  );
+  if (kept.length === Object.keys(byDate).length) return byDate;
+  return Object.fromEntries(kept);
 }
 
 /** Prepend newly logged foods to recents, deduped by food id (newest wins), capped. */
@@ -182,7 +218,10 @@ function applyPage(set: SetState, get: GetState, dtos: DiaryEntryDto[]): void {
     alive.set(entryDate, byMeal);
   }
 
-  const dates = new Set([...Object.keys(state.entriesByDate), ...alive.keys()]);
+  const dates: Set<string> = new Set([
+    ...Object.keys(state.entriesByDate),
+    ...alive.keys(),
+  ]);
   const next: Record<string, EntriesByMeal> = {};
   for (const date of dates) {
     const current = state.entriesByDate[date] ?? emptyEntries();
@@ -207,7 +246,7 @@ function applyPage(set: SetState, get: GetState, dtos: DiaryEntryDto[]): void {
     }, emptyEntries());
   }
 
-  set({ entriesByDate: pruneDays(next) });
+  set({ entriesByDate: pruneDays(next, get().currentDate) });
 }
 
 /** Walk the keyset cursor until the server has nothing newer. */
@@ -234,6 +273,16 @@ type PersistedDiary = {
   deleteOutbox: string[];
   /** Opaque keyset cursor from the last successful delta pull. */
   cursor: string | null;
+  /**
+   * ISO timestamp of the last delta pull that ran to completion.
+   *
+   * The precise thing it licenses: once a full pull has landed, a day inside
+   * the retained window with no entries really is an EMPTY day, not one we
+   * haven't seen. Before that, absence proves nothing and the UI must render a
+   * skeleton rather than "0 kcal". A cursor alone won't do — it advances on
+   * every page, including a walk that was interrupted half way.
+   */
+  lastFullSync: string | null;
 };
 
 type DiaryState = PersistedDiary & {
@@ -243,6 +292,11 @@ type DiaryState = PersistedDiary & {
   updateEntry: (mealId: MealId, entryId: string, patch: EntryPatch) => void;
   removeEntry: (mealId: MealId, entryId: string) => void;
   setDate: (date: string) => void;
+  /**
+   * Pull a single day the device doesn't hold — the user has browsed outside
+   * the retained window. No-op for a day already present.
+   */
+  loadDay: (date: string) => Promise<void>;
   /** Drain the outbox, then pull the server delta. Safe to call on every focus. */
   sync: () => Promise<void>;
   /** Drop everything cached for the signed-in account. See lib/session. */
@@ -263,6 +317,7 @@ export const useDiary = create<DiaryState>()(
       outbox: [],
       deleteOutbox: [],
       cursor: null,
+      lastFullSync: null,
       currentDate: todayKey(),
       syncing: false,
 
@@ -275,10 +330,13 @@ export const useDiary = create<DiaryState>()(
             ...food,
           }));
           return {
-            entriesByDate: pruneDays({
-              ...state.entriesByDate,
-              [state.currentDate]: { ...day, [mealId]: [...day[mealId], ...added] },
-            }),
+            entriesByDate: pruneDays(
+              {
+                ...state.entriesByDate,
+                [state.currentDate]: { ...day, [mealId]: [...day[mealId], ...added] },
+              },
+              state.currentDate,
+            ),
             recentFoods: addRecents(state.recentFoods, foods),
             outbox: added.reduce(
               (queue, entry) =>
@@ -335,7 +393,29 @@ export const useDiary = create<DiaryState>()(
         void get().sync();
       },
 
-      setDate: (date) => set({ currentDate: date }),
+      setDate: (date) => {
+        set({ currentDate: date });
+        void get().loadDay(date);
+      },
+
+      loadDay: async (date) => {
+        if (get().entriesByDate[date] !== undefined) return;
+        try {
+          const { entries } = await diaryApi.listDays({ from: date, to: date });
+          // Seed the day BEFORE folding the rows in, so it is marked present
+          // even when it comes back empty. Without that an empty past day would
+          // stay "unseen" forever and re-fetch on every visit.
+          set((state) =>
+            state.entriesByDate[date] !== undefined
+              ? {}
+              : { entriesByDate: { ...state.entriesByDate, [date]: emptyEntries() } },
+          );
+          applyPage(set, get, entries);
+        } catch {
+          // Offline. The day stays unknown, which the UI renders as a skeleton
+          // rather than as an empty day — absence is not zero.
+        }
+      },
 
       // Unsent outbox writes are discarded, not preserved: they belong to the
       // account being signed out and could never be pushed as anyone else.
@@ -346,6 +426,7 @@ export const useDiary = create<DiaryState>()(
           outbox: [],
           deleteOutbox: [],
           cursor: null,
+          lastFullSync: null,
           currentDate: todayKey(),
           syncing: false,
         }),
@@ -356,6 +437,9 @@ export const useDiary = create<DiaryState>()(
         try {
           await pushOutbox(set, get);
           await pullDelta(set, get);
+          // Only after the walk finishes: this is what lets an empty day inside
+          // the window be read as genuinely empty rather than merely unseen.
+          set({ lastFullSync: new Date().toISOString() });
         } catch {
           // Offline or signed out. Everything stays queued and the persisted
           // cursor is untouched, so the next call resumes exactly here. There
@@ -376,6 +460,7 @@ export const useDiary = create<DiaryState>()(
         outbox: state.outbox,
         deleteOutbox: state.deleteOutbox,
         cursor: state.cursor,
+        lastFullSync: state.lastFullSync,
       }),
       migrate: (persisted, version): PersistedDiary => {
         const saved = (persisted ?? {}) as PersistedDiary;
@@ -431,6 +516,7 @@ export const useDiary = create<DiaryState>()(
           outbox,
           deleteOutbox: [],
           cursor: null,
+          lastFullSync: null,
         };
       },
       // Prune the window and reset the selected day to today on every hydrate.
@@ -443,6 +529,7 @@ export const useDiary = create<DiaryState>()(
           outbox: saved.outbox ?? [],
           deleteOutbox: saved.deleteOutbox ?? [],
           cursor: saved.cursor ?? null,
+          lastFullSync: saved.lastFullSync ?? null,
           currentDate: todayKey(),
         };
       },
@@ -486,6 +573,107 @@ export function useConsumed(): { calories: number; macros: Macros } {
 /** Total logged calories for a meal — summed from its entries. */
 export const mealCalories = (meal: Meal): number =>
   meal.entries.reduce((sum, entry) => sum + entry.calories, 0);
+
+/** Calories and filled meal slots for one stored day. */
+export function dayTotals(day: EntriesByMeal | undefined): {
+  energyKcal: number;
+  mealsLogged: number;
+} {
+  if (!day) return { energyKcal: 0, mealsLogged: 0 };
+  let energyKcal = 0;
+  let mealsLogged = 0;
+  for (const { id } of MEALS) {
+    const entries = day[id];
+    if (entries.length > 0) mealsLogged += 1;
+    for (const entry of entries) energyKcal += entry.calories;
+  }
+  return { energyKcal, mealsLogged };
+}
+
+/**
+ * Whether `date` falls in the window the device keeps entries for. Combined
+ * with a completed `lastFullSync`, this is what licenses reading an absent day
+ * as EMPTY rather than as merely unseen.
+ */
+export function isDateRetained(date: string): boolean {
+  const { from, to } = retentionWindow();
+  return date >= from && date <= to;
+}
+
+/**
+ * Current logging streak from local entries alone.
+ *
+ * `truncated` means the run was still going when it hit the edge of the
+ * retained window, so the real streak is at least this long but the device
+ * can't see how much longer — the one case where the server's count is needed.
+ * Everything shorter is answered with no request at all.
+ *
+ * Counts backwards from today, or yesterday when today is still empty, so an
+ * unfinished today never reads as a broken streak. Future planned days are
+ * never reached and so can never inflate it.
+ */
+export function localStreak(
+  byDate: Record<string, EntriesByMeal>,
+  today: string,
+): { days: number; truncated: boolean } {
+  // Deliberately not dayTotals: this runs on every header render and only needs
+  // to know whether the day has anything at all, not what it adds up to.
+  const logged = (date: string) => {
+    const day = byDate[date];
+    return day !== undefined && MEALS.some(({ id }) => day[id].length > 0);
+  };
+  const oldest = addDays(today, -RETAIN_PAST_DAYS);
+
+  let cursor = logged(today) ? today : addDays(today, -1);
+  let days = 0;
+  while (cursor >= oldest && logged(cursor)) {
+    days += 1;
+    cursor = addDays(cursor, -1);
+  }
+  return { days, truncated: days > 0 && cursor < oldest };
+}
+
+/**
+ * Today's logging streak.
+ *
+ * Local by default — the server value is only consulted when the local run is
+ * truncated, and `max` is what stops a never-fetched 0 from erasing a streak we
+ * can already prove. See useStreak in the header for the fetch that fills it.
+ */
+export function combineStreak(
+  local: { days: number; truncated: boolean },
+  serverStreak: number,
+): number {
+  return local.truncated ? Math.max(local.days, serverStreak) : local.days;
+}
+
+/** The day the app currently considers "today"; advanced by checkDayRollover. */
+let lastKnownToday = todayKey();
+
+/**
+ * Follow a midnight rollover.
+ *
+ * Only moves the selection when the user was sitting on what used to be today
+ * — someone who deliberately navigated to Tuesday should still be on Tuesday
+ * after midnight. Called on app foreground and on Log tab focus, which between
+ * them cover both an app resumed the next morning and one left open overnight.
+ */
+export function checkDayRollover(): void {
+  const today = todayKey();
+  if (today === lastKnownToday) return;
+  const previous = lastKnownToday;
+  lastKnownToday = today;
+  const state = useDiary.getState();
+  if (state.currentDate === previous) state.setDate(today);
+}
+
+/** Wire the foreground half of the rollover check. Returns an unsubscribe. */
+export function initDayRollover(): () => void {
+  const subscription = AppState.addEventListener("change", (status) => {
+    if (status === "active") checkDayRollover();
+  });
+  return () => subscription.remove();
+}
 
 /** Coerce a raw route param to a known meal id, defaulting to breakfast. */
 export function toMealId(value: string): MealId {

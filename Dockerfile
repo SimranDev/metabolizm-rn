@@ -10,10 +10,17 @@ RUN corepack enable
 
 FROM base AS build
 WORKDIR /usr/src/app
+# No `--mount=type=cache` on the pnpm store, deliberately. Railway rejects any
+# cache mount whose id isn't hardcoded to `s/<service-id>-<name>`, and it does
+# not accept the id via build arg — so a cache mount here means pinning this
+# file to one Railway service and breaking the build if that service is ever
+# recreated. BuildKit's ordinary layer cache already covers the common case:
+# `pnpm fetch` is its own layer keyed on the lockfile, so it re-runs only when
+# the lockfile actually changes.
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
-RUN --mount=type=cache,id=pnpm,target=/pnpm/store pnpm fetch
+RUN pnpm fetch
 COPY . .
-RUN --mount=type=cache,id=pnpm,target=/pnpm/store pnpm install --offline --frozen-lockfile
+RUN pnpm install --offline --frozen-lockfile
 # Topological: @metabolizm/shared (tsc) -> api (nest build); mobile has no build script.
 RUN pnpm run -r build
 # pnpm 10 deploy requires --legacy unless inject-workspace-packages=true,

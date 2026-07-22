@@ -44,6 +44,15 @@ topologically (`pnpm run -r build`), packs with `pnpm deploy --prod --legacy`,
 and *guards* both `dist/main.js` and the presence of the migrations inside
 `@metabolizm/db`.
 
+> **Never add a `--mount=type=cache` to that Dockerfile.** Railway rejects any
+> cache mount whose id is not hardcoded as `s/<service-id>-<name>`, failing the
+> build with *"is missing the cacheKey prefix from its id"* — and it does not
+> accept the id through a build arg, so there is no portable spelling. Hardcoding
+> a service id would also pin the file to one Railway service and break if that
+> service were recreated. It buys nothing measurable here anyway: a cold
+> `docker build --no-cache` is ~73 s either way, because `pnpm fetch` is already
+> its own layer keyed on the lockfile.
+
 1. **New project → Add Postgres.** The one provider-compatibility check that
    matters: `0001_food_catalog.sql` runs `CREATE EXTENSION IF NOT EXISTS
    pg_trgm` for the `foods_name_trgm_idx` GIN index. Railway's Postgres allows
@@ -271,6 +280,7 @@ Listed so a failure is diagnosable — no action expected:
 
 | Symptom | Cause |
 | --- | --- |
+| Railway build: *"flag `--mount=type=cache,id=…` is missing the cacheKey prefix from its id"* | A BuildKit cache mount was added to the Dockerfile — remove it (see §1) |
 | "Couldn't reach Metabolizm. Check your connection." | `EXPO_PUBLIC_API_URL` unset or `http://` at build time, or the Railway service is down |
 | "Google sign-in is not configured for this build." | `EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID` missing from the profile's `env` |
 | `DEVELOPER_ERROR` from the native SDK | §3 not done, or the SHA-1 doesn't match this build's keystore |

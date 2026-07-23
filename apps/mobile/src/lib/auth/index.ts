@@ -141,18 +141,52 @@ export async function signInWithApple(opts?: SocialOptions): Promise<AuthUser | 
 
 let googleConfigured = false;
 
-/** Resolves to null when the user dismisses the Google sheet. */
-export async function signInWithGoogle(opts?: SocialOptions): Promise<AuthUser | null> {
+/**
+ * Configure the native Google SDK, once per launch. Returns false when this
+ * build carries no client id, so callers degrade instead of crashing.
+ *
+ * `signOutOfGoogle` needs this as much as sign-in does: the native module
+ * rejects every call with "GoogleSignin has not been configured" while its
+ * client is null, and this flag resets on each cold start even though the
+ * SDK's cached account survives.
+ */
+function configureGoogle(): boolean {
   // EXPO_PUBLIC_ accesses must stay literal member expressions (inlined at
-  // bundle time). Missing config degrades to a clear error, not a crash.
+  // bundle time).
   const webClientId = process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID;
   const iosClientId = process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID;
-  if (!webClientId) {
-    throw new Error('Google sign-in is not configured for this build.');
-  }
+  if (!webClientId) return false;
   if (!googleConfigured) {
     GoogleSignin.configure({ webClientId, iosClientId });
     googleConfigured = true;
+  }
+  return true;
+}
+
+/**
+ * Drop the native Google SDK's cached account.
+ *
+ * Not optional, and not merely tidy. The Android SDK stores the last signed-in
+ * account in the app's own SharedPreferences (`com.google.android.gms.signin`),
+ * and `signIn()` skips the account chooser entirely for as long as that entry
+ * exists. Without this call, signing out and back in silently re-authenticates
+ * the same person and there is no way to pick a different account for the life
+ * of the install. Verified on an emulator: the first sign-in launches gms
+ * `AccountPickerActivity`, the second never does until the cache is cleared.
+ *
+ * Deliberately `signOut()` and not `revokeAccess()` — the latter also tears
+ * down the OAuth grant, forcing a consent screen on every future sign-in.
+ */
+async function signOutOfGoogle(): Promise<void> {
+  if (!configureGoogle()) return;
+  await GoogleSignin.signOut().catch(() => {});
+}
+
+/** Resolves to null when the user dismisses the Google sheet. */
+export async function signInWithGoogle(opts?: SocialOptions): Promise<AuthUser | null> {
+  // Missing config degrades to a clear error, not a crash.
+  if (!configureGoogle()) {
+    throw new Error('Google sign-in is not configured for this build.');
   }
   let idToken: string | null;
   try {
@@ -199,6 +233,9 @@ export async function signOut(): Promise<void> {
     // The app must drop the session immediately even when the server call
     // fails (offline); on success this is a no-op re-delete.
     await clearStoredSession().catch(() => {});
+    // Both sign-out and account deletion reach the native SDK through here:
+    // `lib/session`'s deleteAccount also funnels into endSession -> signOut.
+    await signOutOfGoogle();
   }
 }
 

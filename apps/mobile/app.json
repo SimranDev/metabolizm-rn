@@ -28,6 +28,7 @@
     },
     "plugins": [
       "./plugins/with-workmanager-fix",
+      "./plugins/with-auth-backup-rules",
       "expo-router",
       [
         "expo-splash-screen",
@@ -123,6 +124,16 @@
               "updatePeriodMillis": 1800000
             }
           ]
+        }
+      ],
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "buildArchs": ["arm64-v8a", "armeabi-v7a"],
+            "enableMinifyInReleaseBuilds": true,
+            "enableShrinkResourcesInReleaseBuilds": true
+          }
         }
       ]
     ],
